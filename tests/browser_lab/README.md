@@ -6,4 +6,4 @@ Testa o **painel real** (`painel/index.html` + `scripts/servidor_painel.py`) com
 - **C, endereço http:** Feito, Desfazer e Relatório da empresa. **D, auditoria:** todos os botões e links de `inventario.md`.
 - **Status:** qualquer ❌ reprova o CI. AMBIENTE quer dizer que o teste não conseguiu rodar; ele tenta mais uma vez e, se continuar, vira só aviso no resumo.
 - **Safari:** o WebDriver dele não abre `file://`, então A e B abrem o arquivo com `open -a Safari` e clicam via AppleScript.
-- **Como rodar:** `gh workflow run browser-lab.yml`. O resultado fica no artifact `browser-lab-resumo` e no resumo da execução. Nunca rode no seu computador.
+- **Modos:** RÁPIDO (padrão, em todo push: Ubuntu + Chrome sem janela, menos de 4 min) e COMPLETO (`gh workflow run browser-lab.yml -f modo=completo`). Se o servidor não responder em 10 s, o job para na hora e mostra a saída dele. O resultado fica no artifact `browser-lab-resumo`. Nunca rode no seu computador.

@@ -360,3 +360,30 @@ def test_footer_author_links():
         assert 'href="https://www.linkedin.com/in/roni-clei-santos/" target="_blank" rel="noopener">LinkedIn</a>' in foot
         assert 'href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">GitHub</a>' in foot
         assert 'href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">Dar uma estrela no projeto</a>' in foot
+
+
+def test_server_starts_fast_in_a_temp_folder(tmp_path, monkeypatch):
+    """The real command (scripts/servidor_painel.py) answers /api/estado within 10 s, in a temporary project."""
+    import time
+    make_project(tmp_path, monkeypatch)
+    log = open(tmp_path / "srv.log", "wb")
+    proc = subprocess.Popen([sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(tmp_path)],
+                            cwd=str(tmp_path), stdout=log, stderr=log)
+    try:
+        t0, code = time.time(), None
+        while time.time() - t0 < 10 and code is None:
+            try:
+                port = json.loads((tmp_path / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))["porta"]
+                token = (tmp_path / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
+                req = urllib.request.Request(f"http://127.0.0.1:{port}/api/estado", headers={"X-Painel-Token": token})
+                with urllib.request.urlopen(req, timeout=2) as r:
+                    code = r.status
+            except (OSError, ValueError, KeyError):
+                time.sleep(0.2)
+        log.flush()
+        assert code == 200, (tmp_path / "srv.log").read_text(errors="replace")
+        assert 47321 <= port <= 47330
+    finally:
+        proc.terminate()
+        proc.wait(timeout=10)
+        log.close()

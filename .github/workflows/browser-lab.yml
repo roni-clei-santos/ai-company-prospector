@@ -1,11 +1,20 @@
 name: browser-lab
 
-# Permanent test of the REAL panel in 11 headed browsers (fictitious project): A file:// + server,
-# B file:// without server (click queue), C http, D audit of every button (tests/browser_lab/inventario.md).
+# Permanent test of the REAL panel (fictitious project): A file:// + server, B file:// without server
+# (click queue), C http, D audit of every button (tests/browser_lab/inventario.md).
+# QUICK (every push on these paths, default): Ubuntu + Chrome, headless, under 4 minutes.
+# COMPLETE (workflow_dispatch with modo=completo): 11 headed browsers on macOS, Windows and Ubuntu.
 # Any ❌ fails the job. AMBIENTE (the test could not run) is retried once, then only a warning.
+# If scripts/servidor_painel.py does not answer within 10 s, the job stops at once and prints its output.
 
 on:
   workflow_dispatch:
+    inputs:
+      modo:
+        description: "rapido (Ubuntu + Chrome) ou completo (11 navegadores)"
+        type: choice
+        options: [rapido, completo]
+        default: rapido
   push:
     paths:
       - "painel/**"
@@ -19,24 +28,17 @@ on:
 permissions:
   contents: read
 
+env:
+  MODO: ${{ inputs.modo == 'completo' && 'completo' || 'rapido' }}
+
 jobs:
   lab:
     name: lab ${{ matrix.so }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            so: macos
-            browsers: safari,chrome,edge,firefox,brave
-          - os: windows-latest
-            so: windows
-            browsers: chrome,edge,firefox,brave
-          - os: ubuntu-latest
-            so: ubuntu
-            browsers: chrome,firefox
+      matrix: ${{ fromJSON(inputs.modo == 'completo' && '{"include":[{"os":"macos-latest","so":"macos","browsers":"safari,chrome,edge,firefox,brave"},{"os":"windows-latest","so":"windows","browsers":"chrome,edge,firefox,brave"},{"os":"ubuntu-latest","so":"ubuntu","browsers":"chrome,firefox"}]}' || '{"include":[{"os":"ubuntu-latest","so":"ubuntu","browsers":"chrome"}]}') }}
     steps:
       - uses: actions/checkout@v7
 
@@ -59,31 +61,31 @@ jobs:
           done
 
       - name: Brave (macOS)
-        id: brave_mac
         if: runner.os == 'macOS'
         continue-on-error: true
-        timeout-minutes: 10
+        timeout-minutes: 8
         run: brew install --cask brave-browser
 
       - name: Brave (Windows)
-        id: brave_win
         if: runner.os == 'Windows'
         continue-on-error: true
-        timeout-minutes: 10
+        timeout-minutes: 8
         run: choco install brave -y --no-progress
 
-      - name: Lab (macOS / Windows, headed)
-        if: runner.os != 'Linux'
-        env:
-          BRAVE_INSTALL: ${{ steps.brave_mac.outcome }}${{ steps.brave_win.outcome }}
-        run: python tests/browser_lab/run_lab.py --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
+      - name: Lab, quick (Ubuntu + Chrome, headless)
+        if: env.MODO == 'rapido'
+        run: python tests/browser_lab/run_lab.py --modo rapido --headless --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
 
-      - name: Lab (Linux, headed inside xvfb)
-        if: runner.os == 'Linux'
+      - name: Lab, complete (macOS / Windows, headed)
+        if: env.MODO == 'completo' && runner.os != 'Linux'
+        run: python tests/browser_lab/run_lab.py --modo completo --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
+
+      - name: Lab, complete (Linux, headed inside xvfb)
+        if: env.MODO == 'completo' && runner.os == 'Linux'
         run: |
           command -v xvfb-run >/dev/null || (sudo apt-get update && sudo apt-get install -y xvfb)
           xvfb-run -a -s "-screen 0 1440x900x24" \
-            python tests/browser_lab/run_lab.py --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
+            python tests/browser_lab/run_lab.py --modo completo --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -96,7 +98,7 @@ jobs:
     needs: lab
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -111,7 +113,7 @@ jobs:
 
       - name: Table
         run: |
-          python tests/browser_lab/summarize.py artefatos resumo.md
+          python tests/browser_lab/summarize.py artefatos resumo.md "$MODO"
           cat resumo.md >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7

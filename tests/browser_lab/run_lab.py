@@ -33,7 +33,8 @@ from pathlib import Path
 
 import selenium
 from selenium import webdriver
-from selenium.common.exceptions import JavascriptException, WebDriverException
+from selenium.common.exceptions import (ElementClickInterceptedException, ElementNotInteractableException,
+                                        JavascriptException, StaleElementReferenceException, WebDriverException)
 from selenium.webdriver.common.by import By
 
 HERE = Path(__file__).resolve().parent
@@ -44,6 +45,9 @@ import projeto_lab  # noqa: E402
 
 SYSTEM = platform.system()  # Darwin / Windows / Linux
 SCENARIOS = ("A", "B", "C", "D")
+STEP = 15            # seconds: the longest wait of any step (page, server, Feito, Desfazer)
+SERVER_WAIT = 10     # seconds for the server to answer /api/estado; otherwise the whole job stops
+HEADLESS = False     # --headless (quick mode only)
 QUEUE_KEY = "painel-fila-v1"
 
 
@@ -53,6 +57,10 @@ class Ambiente(Exception):
 
 class Falha(Exception):
     """The panel did not do what it should."""
+
+
+class ServidorNaoSubiu(Exception):
+    """scripts/servidor_painel.py did not answer: stop the whole job at once (with its full output)."""
 
 
 def first_line(e):
@@ -94,22 +102,35 @@ class Projeto:
         return (self.root / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
 
     def start(self):
-        log = open(self.root / "controle" / "servidor-lab.log", "ab")
-        self.proc = subprocess.Popen([sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(self.root)],
-                                     cwd=str(self.root), env=self.env, stdout=log, stderr=log)
+        self.log = self.root / "controle" / "servidor-lab.log"
+        log = open(self.log, "ab")
+        cmd = [sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(self.root)]
+        t0 = time.time()
+        self.proc = subprocess.Popen(cmd, cwd=str(self.root), env=self.env, stdout=log, stderr=log)
 
         def up():
             state = json.loads((self.root / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))
             req = urllib.request.Request(f"http://127.0.0.1:{state['porta']}/api/estado", headers={"X-Painel-Token": self.token})
             with urllib.request.urlopen(req, timeout=2) as r:
                 return state["porta"] if r.status == 200 else None
-        self.port = wait(up, 30)
+        self.port = wait(up, SERVER_WAIT, step=0.2)
+        log.close()
         if not self.port:
-            raise Ambiente("servidor_painel.py não subiu")
+            alive = self.proc.poll() is None
+            self.stop()
+            raise ServidorNaoSubiu(
+                f"servidor_painel.py não respondeu /api/estado em {SERVER_WAIT} s "
+                f"({'processo vivo' if alive else 'processo saiu com código ' + str(self.proc_exit)})\n"
+                f"comando: {cmd}\npasta: {self.root}\nPROSPECT_DIR={self.env.get('PROSPECT_DIR')}\n"
+                f"--- saída do servidor ---\n{self.log.read_text(errors='replace')}")
+        self.subiu_em = round(time.time() - t0, 2)
         return self.port
+
+    proc_exit = None
 
     def stop(self):
         if self.proc:
+            self.proc_exit = self.proc.poll()
             self.proc.terminate()
             try:
                 self.proc.wait(timeout=10)
@@ -237,6 +258,9 @@ class Navegador:
                 profile = tempfile.mkdtemp(prefix=f"perfil-{nav}-", dir=self.tmp_root)
                 for a in ("--no-first-run", "--no-default-browser-check", f"--user-data-dir={profile}", "--window-size=1280,900"):
                     opts.add_argument(a)
+                if HEADLESS:
+                    opts.add_argument("--headless=new")
+                opts.page_load_strategy = "eager"  # do not wait for the web font of the panel
                 opts.set_capability("ms:loggingPrefs" if nav == "edge" else "goog:loggingPrefs", {"browser": "ALL"})
                 if nav == "edge":
                     drv = webdriver.Edge(options=opts)
@@ -246,6 +270,7 @@ class Navegador:
             elif nav == "firefox":
                 opts = webdriver.FirefoxOptions()
                 opts.binary_location = self.binary
+                opts.page_load_strategy = "eager"
                 opts.add_argument("-profile")
                 opts.add_argument(tempfile.mkdtemp(prefix="perfil-firefox-", dir=self.tmp_root))
                 drv = webdriver.Firefox(options=opts)
@@ -260,7 +285,13 @@ class Navegador:
         caps = drv.capabilities
         v = caps.get("browserVersion") or caps.get("version")
         self.versao = f"{self.brave_raw} (Chromium {v})" if nav == "brave" else (self.versao if nav == "safari" and self.versao else v)
-        drv.set_page_load_timeout(30)
+        drv.set_page_load_timeout(STEP)
+        drv.set_script_timeout(STEP)
+        if HEADLESS and nav == "chrome":  # headless has no focused window: let the page use the clipboard
+            try:
+                drv.execute_cdp_cmd("Browser.grantPermissions", {"permissions": ["clipboardReadWrite", "clipboardSanitizedWrite"]})
+            except WebDriverException:
+                pass
         return drv
 
 
@@ -310,17 +341,23 @@ class Pagina:
         return self.drv.execute_script("return (function(){ " + code + " })()")
 
     def click(self, css, index=0):
-        """Real (native) click on the element; scrolls it to the middle of the window first."""
-        els = self.drv.find_elements(By.CSS_SELECTOR, css)
-        if len(els) <= index:
-            raise Falha(f"não achei {css}")
-        el = els[index]
-        self.drv.execute_script("arguments[0].scrollIntoView({block:'center'})", el)
-        time.sleep(0.2)
-        try:
-            el.click()
-        except WebDriverException as e:
-            raise Falha(f"clique em {css} falhou: {first_line(e)}") from e
+        """Real (native) click. The page redraws itself after talking to the server, so the element is
+        looked up again on every try; the scroll is instant (the panel scrolls smoothly by default)."""
+        last = f"não achei {css}"
+        for _ in range(5):
+            els = self.drv.find_elements(By.CSS_SELECTOR, css)
+            if len(els) <= index:
+                time.sleep(0.4)
+                continue
+            try:
+                self.drv.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'})", els[index])
+                time.sleep(0.1)
+                els[index].click()
+                return
+            except (StaleElementReferenceException, ElementClickInterceptedException, ElementNotInteractableException) as e:
+                last = first_line(e)
+                time.sleep(0.4)
+        raise Falha(f"clique em {css} falhou: {last}")
 
     def shot(self, path):
         try:
@@ -346,8 +383,8 @@ class SafariApple(Pagina):
         p = subprocess.run(["open", "-a", "Safari", url], capture_output=True, text=True, timeout=30)
         if p.returncode != 0:
             raise Ambiente(f"open -a Safari falhou: {(p.stderr or p.stdout).strip()[:200]}")
-        if not wait(lambda: self.js("return document.readyState") == "complete", 20):
-            raise Ambiente("Safari não respondeu ao AppleScript (do JavaScript): " + self.last_error)
+        if not wait(lambda: self.js("return document.readyState") in ("interactive", "complete"), STEP):
+            raise Ambiente("Safari não respondeu ao AppleScript (do JavaScript): " + (self.last_error or "sem resposta"))
 
     last_error = ""
 
@@ -355,7 +392,10 @@ class SafariApple(Pagina):
         src = "JSON.stringify((function(){ " + code + " })())"
         script = 'tell application "Safari" to do JavaScript "' + src.replace("\\", "\\\\").replace('"', '\\"') + \
                  '" in current tab of front window'
-        p = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=20)
+        try:
+            p = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=8)
+        except subprocess.TimeoutExpired as e:
+            raise Ambiente("AppleScript do Safari sem resposta em 8 s (permissão de automação do runner?)") from e
         if p.returncode != 0:
             SafariApple.last_error = p.stderr.strip()[:300]
             if re.search(r"Allow JavaScript from Apple Events|not allowed|Not authori[sz]ed|-1743", p.stderr, re.I):
@@ -394,7 +434,7 @@ def quit_safari():
 
 
 # ---------------------------------------------------------------- shared checks on the panel
-def panel_ready(pg, secs=30):
+def panel_ready(pg, secs=STEP):
     if not wait(lambda: pg.js("return document.querySelectorAll('input[data-done]').length") > 0, secs):
         raise Falha("o painel não mostrou nenhum item com Feito")
 
@@ -456,7 +496,7 @@ def cenario_a(ctx):
         pg = ctx.page_file()
         pg.open(proj.index.as_uri())
         panel_ready(pg)
-        if not wait(lambda: "Marcou como Feito" in status_text(pg), 15):
+        if not wait(lambda: "Marcou como Feito" in status_text(pg), STEP):
             raise Falha(f"o arquivo não falou com o servidor (status: {status_text(pg)[:80]!r})")
         steps.append("arquivo + servidor: online")
         feito_e_desfazer(pg, proj, steps)
@@ -660,6 +700,8 @@ class Ctx:
 
     def page_file(self):
         if self.nav == "safari":
+            if getattr(self.browser, "apple_off", None):
+                raise Ambiente(self.browser.apple_off)
             self.pg = SafariApple()
         else:
             self.pg = Pagina(self.browser.driver())
@@ -705,6 +747,8 @@ def run_scenario(fn, ctx):
         res = {"status": "falha", "motivo": str(e)}
     except Ambiente as e:
         res = {"status": "ambiente", "motivo": str(e)}
+        if ctx.nav == "safari" and ("AppleScript" in str(e) or "Apple Events" in str(e)):
+            ctx.browser.apple_off = str(e)
     except JavascriptException as e:  # the page did not have what the step expected
         res = {"status": "falha", "motivo": f"erro na página: {first_line(e)}"}
     except WebDriverException as e:
@@ -725,13 +769,15 @@ def run_browser(nav, so, out, tmp):
     ctx = Ctx(so, nav, out, tmp, browser)
     for name, fn in zip(SCENARIOS, (cenario_a, cenario_b, cenario_c, cenario_d)):
         r = run_scenario(fn, ctx)
-        if r["status"] == "ambiente":  # one more try; if it persists, it is a warning
+        if r["status"] == "ambiente" and not getattr(browser, "apple_off", None):  # one more try; then a warning
             first = r["motivo"]
             r = run_scenario(fn, ctx)
             r["tentativas"] = 2
             if r["status"] == "ambiente":
                 r["aviso"] = True
                 r["primeira_tentativa"] = first
+        if r["status"] == "ambiente":
+            r["aviso"] = True
         res["cenarios"][name] = r
         print(f"   {name}: {r['status']} {r.get('motivo', '')[:160]}", flush=True)
     res["versao"] = browser.versao
@@ -743,17 +789,40 @@ def main(argv=None):
     ap.add_argument("--so", required=True)
     ap.add_argument("--browsers", required=True)
     ap.add_argument("--out", default="results")
+    ap.add_argument("--modo", default="completo", choices=("rapido", "completo"))
+    ap.add_argument("--headless", action="store_true", help="sem janela (só no modo rápido)")
     args = ap.parse_args(argv)
+    global HEADLESS
+    HEADLESS = args.headless
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="browser-lab-")
-    results = {"so": args.so, "plataforma": platform.platform(), "maquina": platform.machine(),
-               "python": sys.version.split()[0], "selenium": selenium.__version__, "navegadores": []}
+    results = {"so": args.so, "modo": args.modo, "headless": HEADLESS, "plataforma": platform.platform(),
+               "maquina": platform.machine(), "python": sys.version.split()[0], "selenium": selenium.__version__,
+               "navegadores": []}
     failed = False
+    # the server must start ONCE before anything else; otherwise stop the job now, with its full output
+    pre = Projeto(tmp, "preflight")
+    try:
+        pre.start()
+        results["servidor_subiu_em_s"] = pre.subiu_em
+        print(f"servidor_painel.py respondeu /api/estado em {pre.subiu_em} s (porta {pre.port})", flush=True)
+    except ServidorNaoSubiu as e:
+        print(str(e), flush=True)
+        results["erro_servidor"] = str(e)
+        (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+        return 1
+    finally:
+        pre.stop()
     for nav in [b.strip() for b in args.browsers.split(",") if b.strip()]:
         print(f"== {args.so} / {nav}", flush=True)
         try:
             r = run_browser(nav, args.so, out, tmp)
+        except ServidorNaoSubiu as e:  # stop the job at once
+            print(str(e), flush=True)
+            results["erro_servidor"] = str(e)
+            (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+            return 1
         except Exception:  # noqa: BLE001 - a bug in the lab itself
             r = {"so": args.so, "navegador": nav, "erro_do_laboratorio": traceback.format_exc()}
             print(r["erro_do_laboratorio"], flush=True)

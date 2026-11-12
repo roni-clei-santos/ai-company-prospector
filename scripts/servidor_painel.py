@@ -31,6 +31,7 @@ import hmac
 import json
 import os
 import re
+import socketserver
 import sys
 import time
 from datetime import date
@@ -66,6 +67,12 @@ def find_item(data, item_id):
 class PanelServer(HTTPServer):
     # On Windows SO_REUSEADDR lets a second program bind a port already in use: never set it there.
     allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        # HTTPServer.server_bind() calls socket.getfqdn(), a reverse DNS lookup of 127.0.0.1. On macOS that
+        # goes through mDNS ("find devices on local networks") and can hold the start for a long time.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 def make_handler(root, token, today=None):
