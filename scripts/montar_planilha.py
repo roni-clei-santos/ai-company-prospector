@@ -102,7 +102,7 @@ def clean(rows, exclude, former):
     return out, rejected
 
 
-def build(rows, output, title):
+def build(rows, output, title, skipped_sources=None):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Empresas"
@@ -139,6 +139,11 @@ def build(rows, output, title):
         if label == "Tipo":
             rs.append(["Total", f"=SUM(B{first}:B{rs.max_row})"])
         rs.append([None, None])
+    rs.append(["Fontes que ficaram de fora", None])
+    rs[rs.max_row][0].font = Font(bold=True)
+    for src in (skipped_sources or ["Nenhuma: todas as fontes foram consultadas."]):
+        rs.append([src, None])
+    rs.append([None, None])
     rs.append(["Legenda", None])
     rs[rs.max_row][0].font = Font(bold=True)
     rs.append(["Certeza = evidência direta e atual (vaga, site, case, diretório oficial).", None])
@@ -167,6 +172,8 @@ def main(argv=None):
     ap.add_argument("--ex-empregadores", default="")
     ap.add_argument("--limite", type=int)
     ap.add_argument("--titulo", default="")
+    ap.add_argument("--fontes-fora", default="",
+                    help='fontes não consultadas, separadas por ";" (ex.: "LinkedIn Jobs (sem Chrome)")')
     args = ap.parse_args(argv)
     rows = json.loads(Path(args.entrada).read_text(encoding="utf-8"))
     kept, rejected = clean(rows, split_list(args.excluir), split_list(args.ex_empregadores))
@@ -175,7 +182,8 @@ def main(argv=None):
     if not kept:
         print("Nenhuma empresa válida."); return 1
     root = project_root()
-    build(kept, root / args.saida if not Path(args.saida).is_absolute() else args.saida, args.titulo)
+    build(kept, root / args.saida if not Path(args.saida).is_absolute() else args.saida, args.titulo,
+          split_list(args.fontes_fora))
     created = ensure_progress(root)
     print(f"{len(kept)} empresas gravadas em {args.saida}")
     for name, why in rejected:

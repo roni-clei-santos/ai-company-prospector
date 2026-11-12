@@ -72,6 +72,15 @@ https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
 </picture>
 <p align="center"><sub>Numbers from the author's real use.</sub></p>
 
+## Two ways to use it
+
+| | **Spreadsheet only** | **Spreadsheet + robot** |
+|---|---|---|
+| Command | `/build-company-list` | `/build-company-list`, then `/next-companies` every round |
+| Needs LinkedIn? | No | Yes, logged in on Chrome (Claude in Chrome extension) |
+| What you get | Real companies using your tech stack, each with evidence and a source link | The full flow: rounds of 10 companies, jobs scored, LinkedIn and email drafts and the dashboard |
+| Who reaches out | You, on your own | You send the drafts the robot prepared |
+
 ## Quick start
 
 <details open>
@@ -122,13 +131,14 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 `install.ps1` checks Python (`py -3` or `python`), installs RTK with `winget` and **copies** the skills to `%USERPROFILE%\.claude\skills`. After every `git pull`, run `py -3 scripts\atualizar_skills.py` to copy the new version.
 </details>
 
-Then, on all three systems: open Claude Code in the folder (`claude`), run `/chrome`, log in to LinkedIn in that Chrome, fill in `perfil.local.md` and run **`/build-company-list`**. Every round: **`/next-companies`**.
+Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the folder (`claude`) and run **`/build-company-list`** to get the spreadsheet (no LinkedIn needed). For "Spreadsheet + robot": run `/chrome`, log in to LinkedIn in that Chrome and run **`/next-companies`** every round.
 
 ## Requirements
 
 | System | You need |
 |---|---|
-| All | [Claude Code](https://code.claude.com/docs/en/setup) logged in, Git, Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account |
+| All | [Claude Code](https://code.claude.com/docs/en/setup) logged in and Git |
+| "Spreadsheet + robot" only | Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account logged in on that Chrome |
 | macOS 13+ | [Homebrew](https://brew.sh) (the installer takes care of Python 3 and RTK) |
 | Linux | `sudo` and `apt`, `dnf` or `pacman`, or Python 3.9+ with `pip` already installed |
 | Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.12`) |
@@ -151,6 +161,12 @@ Full step-by-step guide (Portuguese): [docs/guia](docs/guia/01-instalacao.md). T
 <summary><b>Is it safe for my LinkedIn account?</b></summary>
 
 The agent only reads, in your own logged-in Chrome, screens you would see yourself: sent invitations, messages, jobs, pages and profiles. It browses at a human pace and stops using LinkedIn for the round if a rate-limit or verification warning shows up. Still, LinkedIn's terms restrict automation (see the notice below).
+</details>
+
+<details>
+<summary><b>Can I use it without connecting my LinkedIn?</b></summary>
+
+Yes, in "Spreadsheet only" mode. `/build-company-list` does not need LinkedIn: you get real companies using your tech stack, each with evidence and a source link, and you reach out yourself. A LinkedIn account logged in on Chrome is only required for "Spreadsheet + robot" (`/next-companies`), with rounds of 10, drafts and the dashboard.
 </details>
 
 <details>

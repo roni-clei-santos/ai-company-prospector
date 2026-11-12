@@ -11,7 +11,7 @@ Tudo sobre o CANDIDATO está em `perfil.local.md` (o PERFIL). Nunca escreva dado
 
 ## Passo 0 — Preflight (pare se falhar)
 
-1. Leia e siga `skills/_shared/preflight.md` (pasta e perfil, Chrome conectado, LinkedIn logado e, se `modo_email` = "gmail_rascunho", Gmail logado).
+1. Leia e siga, nesta ordem, `skills/_shared/preflight-basico.md` (pasta e perfil) e `skills/_shared/preflight-linkedin.md` (Chrome conectado, LinkedIn logado e, se `modo_email` = "gmail_rascunho", Gmail logado).
 2. Confira se existe `controle/progresso.json`. Se não existir, PARE e responda: "Não achei o controle/progresso.json. Rode /build-company-list primeiro (ou copie a planilha de empresas para cá e rode de novo)."
 3. Se `progresso.json` não for um JSON válido, PARE e responda: "O controle/progresso.json está corrompido; não mexi em nada. Para restaurar a última versão boa, veja docs/guia/07-faq-e-erros.md." Mostre a linha do erro.
 
@@ -72,7 +72,7 @@ Para cada uma, nesta ordem:
 ## Regras fixas (valem em toda a rodada)
 
 - NUNCA envie e-mail, mensagem de LinkedIn ou candidatura que o PROMPT não autorize. E-mail e LinkedIn são sempre só rascunho.
-- LinkedIn: SÓ LEITURA (regra em `skills/_shared/preflight.md`). Pode abrir convites enviados, mensagens, abas Jobs e People de empresas e páginas de vaga. Proibido: enviar, aceitar, retirar convite, responder, arquivar, apagar, seguir, curtir.
+- LinkedIn: SÓ LEITURA (regra em `skills/_shared/preflight-linkedin.md`). Pode abrir convites enviados, mensagens, abas Jobs e People de empresas e páginas de vaga. Proibido: enviar, aceitar, retirar convite, responder, arquivar, apagar, seguir, curtir.
 - E-mail conforme `modo_email`: "arquivo" = só `rascunhos/email/*.md`; "gmail_rascunho" = rascunho no Gmail pelo navegador (nunca clicar em Enviar). No modo Gmail, releia cada rascunho logo depois de criá-lo: destinatário certo, assunto, corpo não vazio e currículo anexado. Se algo falhar, corrija antes de seguir.
 - Notas de convite do LinkedIn com até 200 caracteres. Rode `python3 scripts/checar_notas.py` ao fim da rodada e corrija o que ele apontar.
 - Vaga de gestão (Delivery Leader, Gerente de Projetos, Coordenador, Head, Product Manager e parecidas) nunca recebe candidatura automática: registre como `VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR` e siga.

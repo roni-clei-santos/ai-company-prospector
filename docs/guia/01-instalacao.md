@@ -8,8 +8,7 @@ Escolha o seu sistema. macOS e Linux usam o `install.sh`; Windows usa o `install
 
 - [Claude Code](https://code.claude.com/docs/en/setup) instalado e logado, com uma conta do Claude que dê acesso ao Claude Code;
 - Git;
-- Google Chrome com a extensão Claude in Chrome conectada ([guia do Chrome](03-chrome.md));
-- uma conta no LinkedIn, logada nesse Chrome.
+- só para o modo "Planilha + robô" (`/next-companies`): Google Chrome com a extensão Claude in Chrome conectada ([guia do Chrome](03-chrome.md)) e uma conta no LinkedIn, logada nesse Chrome. O modo "Só a planilha" (`/build-company-list`) não precisa de LinkedIn ([os dois jeitos](04-planilha.md#dois-jeitos-de-usar)).
 
 <details open>
 <summary><b>macOS</b></summary>

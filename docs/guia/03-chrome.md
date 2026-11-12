@@ -2,11 +2,11 @@
 
 [← Perfil](02-perfil.md) · [Próximo: a planilha →](04-planilha.md)
 
-As skills usam o **seu** Chrome, com as **suas** sessões, para ler o LinkedIn (e o Gmail, se você escolher `modo_email: "gmail_rascunho"`).
+O `/next-companies` (modo "Planilha + robô") usa o **seu** Chrome, com as **suas** sessões, para ler o LinkedIn (e o Gmail, se você escolher `modo_email: "gmail_rascunho"`). O `/build-company-list` não precisa do LinkedIn: se o Chrome estiver conectado, ele só o usa para páginas que bloqueiam a busca normal; se não estiver, segue sem ele e anota na planilha as fontes que ficaram de fora.
 
 1. Instale a extensão **Claude in Chrome** pela Chrome Web Store e entre com a mesma conta do Claude.
 2. Abra o Claude Code na pasta do projeto e rode `/chrome`. Confirme que aparece como conectado.
-3. Rode `/build-company-list` (ou `/next-companies`). O primeiro passo (preflight) abre `https://www.linkedin.com/feed/` numa aba nova:
+3. Rode `/next-companies`. O primeiro passo (preflight) abre `https://www.linkedin.com/feed/` numa aba nova:
    - se você estiver logado, ele segue sozinho;
    - se cair na tela de login, ele para e pede: **"Entre no LinkedIn nessa aba do Chrome e digite: pronto."** Entre na sua conta nessa aba e digite `pronto` no Claude Code.
 

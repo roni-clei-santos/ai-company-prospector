@@ -72,6 +72,15 @@ O `perfil.local.md` é a única fonte de verdade sobre você (histórico com dat
 </picture>
 <p align="center"><sub>Números do uso real do autor.</sub></p>
 
+## Dois jeitos de usar
+
+| | **Só a planilha** | **Planilha + robô** |
+|---|---|---|
+| Comando | `/build-company-list` | `/build-company-list` e depois `/next-companies` a cada rodada |
+| Precisa de LinkedIn? | Não | Sim, logado no Chrome (extensão Claude in Chrome) |
+| O que você recebe | Empresas reais que usam a sua tecnologia, cada uma com evidência e link da fonte | O fluxo completo: rodadas de 10 empresas, vagas avaliadas, rascunhos de LinkedIn e e-mail e o painel |
+| Quem faz o contato | Você, por conta própria | Você envia os rascunhos que o robô preparou |
+
 ## Começo rápido
 
 <details open>
@@ -122,13 +131,14 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 O `install.ps1` confere o Python (`py -3` ou `python`), instala o RTK com o `winget` e **copia** as skills para `%USERPROFILE%\.claude\skills`. Depois de cada `git pull`, rode `py -3 scripts\atualizar_skills.py` para copiar a versão nova.
 </details>
 
-Depois, nos três sistemas: abra o Claude Code na pasta (`claude`), rode `/chrome`, entre no LinkedIn nesse Chrome, preencha o `perfil.local.md` e rode **`/build-company-list`**. A cada rodada: **`/next-companies`**.
+Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na pasta (`claude`) e rode **`/build-company-list`** para receber a planilha (não precisa de LinkedIn). Para o modo "Planilha + robô": rode `/chrome`, entre no LinkedIn nesse Chrome e rode **`/next-companies`** a cada rodada.
 
 ## Requisitos
 
 | Sistema | Você precisa de |
 |---|---|
-| Todos | [Claude Code](https://code.claude.com/docs/en/setup) logado, Git, Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn |
+| Todos | [Claude Code](https://code.claude.com/docs/en/setup) logado e Git |
+| Só no modo "Planilha + robô" | Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn logada nesse Chrome |
 | macOS 13+ | [Homebrew](https://brew.sh) (o instalador cuida do Python 3 e do RTK) |
 | Linux | `sudo` e `apt`, `dnf` ou `pacman`, ou Python 3.9+ com `pip` já instalados |
 | Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) ou `winget install Python.Python.3.12`) |
@@ -151,6 +161,12 @@ Passo a passo completo: [docs/guia](docs/guia/01-instalacao.md).
 <summary><b>É seguro para o meu LinkedIn?</b></summary>
 
 O agente só lê, no seu Chrome já logado, telas que você mesmo veria: convites enviados, mensagens, vagas, páginas e perfis. Ele navega em ritmo humano e para de usar o LinkedIn na rodada se aparecer aviso de limite ou verificação. Mesmo assim, os termos do LinkedIn restringem automação (veja o aviso abaixo).
+</details>
+
+<details>
+<summary><b>Posso usar sem conectar meu LinkedIn?</b></summary>
+
+Sim, no modo "Só a planilha". O `/build-company-list` não precisa de LinkedIn: você recebe empresas reais que usam a sua tecnologia, cada uma com evidência e link da fonte, e faz o contato você mesmo. O LinkedIn logado no Chrome só é exigido no modo "Planilha + robô" (`/next-companies`), com rodadas de 10, rascunhos e painel.
 </details>
 
 <details>

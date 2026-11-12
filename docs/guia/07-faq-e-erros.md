@@ -38,7 +38,7 @@ Confira o arquivo com `python3 -m json.tool controle/progresso.json` antes de ro
 
 ## O LinkedIn está deslogado
 
-O preflight para com: "Entre no LinkedIn nessa aba do Chrome e digite: pronto." Entre na conta nessa aba e digite `pronto`. Se o LinkedIn pedir verificação (código, CAPTCHA), resolva você mesmo; o agente nunca digita senha nem resolve CAPTCHA.
+O preflight do `/next-companies` para com: "Entre no LinkedIn nessa aba do Chrome e digite: pronto." (o `/build-company-list` não pede login). Entre na conta nessa aba e digite `pronto`. Se o LinkedIn pedir verificação (código, CAPTCHA), resolva você mesmo; o agente nunca digita senha nem resolve CAPTCHA.
 
 ## O Chrome está desconectado
 

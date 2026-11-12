@@ -59,3 +59,15 @@ def test_limit_and_progress_not_overwritten(project):
     ws = openpyxl.load_workbook(project / "out.xlsx")["Empresas"]
     assert ws.max_row == 4
     assert json.loads((project / "controle" / "progresso.json").read_text(encoding="utf-8"))["empresas"] == [{"numero": 1}]
+
+
+def test_skipped_sources_listed_in_summary(project):
+    src = project / "c.json"
+    src.write_text(json.dumps([row("Loja Exemplo 1", "https://l1.example.com")]), encoding="utf-8")
+    assert montar_planilha.main([str(src), "a.xlsx", "--fontes-fora", "LinkedIn Jobs (Chrome não conectado); Clutch (bloqueou o acesso)"]) == 0
+    col = [r[0] for r in openpyxl.load_workbook(project / "a.xlsx")["Resumo"].iter_rows(values_only=True)]
+    i = col.index("Fontes que ficaram de fora")
+    assert col[i + 1:i + 3] == ["LinkedIn Jobs (Chrome não conectado)", "Clutch (bloqueou o acesso)"]
+    assert montar_planilha.main([str(src), "b.xlsx"]) == 0
+    col = [r[0] for r in openpyxl.load_workbook(project / "b.xlsx")["Resumo"].iter_rows(values_only=True)]
+    assert col[col.index("Fontes que ficaram de fora") + 1].startswith("Nenhuma")

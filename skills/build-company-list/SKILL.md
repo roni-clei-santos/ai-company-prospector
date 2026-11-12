@@ -9,9 +9,13 @@ Objetivo: montar, para qualquer pessoa, uma planilha de empresas que usam uma te
 
 Parâmetro opcional: `limite N` (ex.: `/build-company-list limite 5`) para parar em N empresas válidas (usado em testes).
 
-## Passo 0 — Preflight
+## Passo 0 — Preflight (só o básico)
 
-Leia e siga `skills/_shared/preflight.md` (pasta e perfil, Chrome conectado, LinkedIn logado). O LinkedIn aqui é SÓ LEITURA (páginas de empresa, abas Jobs e People, páginas de vaga).
+1. Leia e siga `skills/_shared/preflight-basico.md` (pasta do projeto e `perfil.local.md`). Esta skill NÃO exige Chrome nem LinkedIn: não confira login e não peça para a pessoa entrar no LinkedIn.
+2. **Chrome (opcional).** As fontes do Passo 2 são pesquisadas com WebSearch e WebFetch. O Chrome só ajuda em páginas que bloqueiam o WebFetch (ex.: Clutch) e na fonte 6 (LinkedIn Jobs). Para saber se ele está disponível, carregue as ferramentas do Chrome (`select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__get_page_text`) e chame `tabs_context_mcp` UMA vez:
+   - se funcionar: pode usar o Chrome nessas páginas. O LinkedIn Jobs só entra se a página abrir já logada; se cair na tela de login, pule essa fonte (não peça login). No LinkedIn, SÓ LEITURA: nunca clique em candidatar-se, seguir, conectar ou enviar;
+   - se não funcionar (ferramentas ausentes ou erro): siga só com WebSearch e WebFetch, sem parar e sem pedir nada.
+   Anote numa lista cada fonte que ficou de fora e o motivo (ex.: "LinkedIn Jobs (Chrome não conectado)", "Clutch (bloqueou o acesso sem navegador)"). Essa lista vai para a planilha no Passo 3.
 
 ## Passo 1 — Perguntas iniciais (UMA mensagem só)
 
@@ -35,7 +39,7 @@ Para cada fonte, registre cada empresa encontrada num arquivo de trabalho `contr
 3. **TheirStack**: página da tecnologia no país (ex.: `theirstack.com/en/technology/magento/br`), empresas que usam ou contratam a tecnologia.
 4. **Eventos da comunidade**: patrocinadores e palestrantes (ex.: Meet Magento, Adobe Summit, VTEX Day, meetups locais).
 5. **Parceiros de ferramentas do ecossistema** (ex.: parceiros Hyvä para Magento; parceiros de módulos, gateways e ERPs conhecidos da tecnologia).
-6. **Vagas abertas que citam a tecnologia** no país: LinkedIn Jobs (só leitura), Gupy, Glassdoor, sites de carreira e TheirStack Jobs. **Nunca use o Indeed** (nem os outros de `fontes_proibidas` do PERFIL).
+6. **Vagas abertas que citam a tecnologia** no país: Gupy, Glassdoor, sites de carreira, TheirStack Jobs e, se o Chrome estiver conectado e o LinkedIn já logado, LinkedIn Jobs (só leitura). **Nunca use o Indeed** (nem os outros de `fontes_proibidas` do PERFIL).
 7. **Cases públicos de agências** (páginas de cases, portfólios, notícias de lançamento de lojas) para achar marcas/varejistas que usam a tecnologia.
 
 Pare de pesquisar quando 3 buscas SEGUIDAS não trouxerem nenhuma empresa nova (ou quando atingir o `limite N`). Diga no resumo em qual fonte isso aconteceu.
@@ -57,16 +61,18 @@ Pare de pesquisar quando 3 buscas SEGUIDAS não trouxerem nenhuma empresa nova (
 
 1. Nome do arquivo: `empresas-<tecnologia>-<pais>.xlsx`, tudo minúsculo, sem acento, palavras separadas por hífen, só a primeira palavra da tecnologia (ex.: `empresas-magento-brasil.xlsx`, `empresas-vtex-portugal.xlsx`).
 2. Rode:
-   `python3 scripts/montar_planilha.py controle/empresas-coletadas.json <arquivo.xlsx> --titulo "<tecnologia> / <país>" --excluir "<A;B>" --ex-empregadores "<C;D>" [--limite N]`
-   O script grava a aba `Empresas` (colunas `#`, `Empresa`, `Tipo`, `Cidade/UF`, `Evidência`, `Confiança`, `Serve para`, `Observação`, `Fonte`) e a aba `Resumo` (contagem por tipo, por confiança, por "Serve para" e legenda), remove duplicatas, descarta linhas sem fonte e excluídas, marca ex-empregadores e pinta "Provável" de amarelo. Ele também cria `controle/progresso.json` vazio e pronto para o `/next-companies`, se ainda não existir (nunca sobrescreve).
+   `python3 scripts/montar_planilha.py controle/empresas-coletadas.json <arquivo.xlsx> --titulo "<tecnologia> / <país>" --excluir "<A;B>" --ex-empregadores "<C;D>" --fontes-fora "<fonte (motivo);fonte (motivo)>" [--limite N]`
+   (`--fontes-fora` = a lista do Passo 0.2; sem fontes de fora, omita a opção.)
+   O script grava a aba `Empresas` (colunas `#`, `Empresa`, `Tipo`, `Cidade/UF`, `Evidência`, `Confiança`, `Serve para`, `Observação`, `Fonte`) e a aba `Resumo` (contagem por tipo, por confiança, por "Serve para", as fontes que ficaram de fora e a legenda), remove duplicatas, descarta linhas sem fonte e excluídas, marca ex-empregadores e pinta "Provável" de amarelo. Ele também cria `controle/progresso.json` vazio e pronto para o `/next-companies`, se ainda não existir (nunca sobrescreve).
 3. Atualize o campo `planilha_empresas` do `perfil.local.md` com o nome do arquivo (só esse campo; não mexa em mais nada do perfil).
 4. Abra a planilha gerada com openpyxl e confira: número de linhas, toda linha com Fonte começando com `http`, nenhum nome repetido.
 
 ## Passo 4 — Resposta
 
 Responda só com:
-- "Planilha pronta: <arquivo> com <N> empresas (<x> Certeza, <y> Provável)."
+- "<N> empresas (<x> Certeza, <y> Provável)."
 - Tabela curta: contagem por Tipo e por "Serve para".
-- As fontes usadas e onde a pesquisa parou (3 buscas sem empresa nova, ou limite).
+- As fontes usadas, as que ficaram de fora (com o motivo) e onde a pesquisa parou (3 buscas sem empresa nova, ou limite).
 - Empresas que ficaram de fora e o motivo (excluídas, sem fonte, duplicadas).
-- "Próximo passo: /next-companies"
+- E termine com esta frase, trocando só o caminho:
+  "Sua planilha está pronta: <caminho do arquivo>. Você pode usar a lista e fazer os contatos por conta própria, ou deixar o robô pesquisar cada empresa e preparar os rascunhos: entre no LinkedIn no Chrome e rode /next-companies."

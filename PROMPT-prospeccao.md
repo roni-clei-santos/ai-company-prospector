@@ -48,7 +48,7 @@ Faça nesta ordem. Se alguma falhar, PARE e avise o CANDIDATO com a mensagem de 
    Erro: "Não achei a planilha <nome> na pasta (ou ela não tem a aba Empresas). Rode /build-company-list ou coloque a planilha aqui."
 3. O PDF do campo `curriculo_base` existe na PASTA.
    Erro: "Não achei o PDF do seu currículo (<nome>) na pasta."
-4. O Chrome está conectado e o LinkedIn está logado (`skills/_shared/preflight.md`). Se `modo_email` = "gmail_rascunho", abra também `https://mail.google.com/` e confirme que está logado na conta do campo `email`.
+4. O Chrome está conectado e o LinkedIn está logado (`skills/_shared/preflight-linkedin.md`). Se `modo_email` = "gmail_rascunho", abra também `https://mail.google.com/` e confirme que está logado na conta do campo `email`.
    Erro: "O navegador não está conectado ou o LinkedIn/Gmail não está logado. Rode /chrome e confira os logins."
 5. Se o arquivo do campo `arquivo_respostas` NÃO existir: faça ao CANDIDATO, DE UMA VEZ SÓ, as perguntas da seção 3, mais qualquer outra dúvida geral que você tiver depois de ler este documento, o PERFIL e a planilha. Espere as respostas antes de qualquer candidatura ou rascunho e salve-as nesse arquivo. Se o arquivo já existir, NÃO pergunte de novo: use as respostas que estão lá.
 
