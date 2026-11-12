@@ -255,8 +255,109 @@ def page_scenario(ctx, drv, cenario, url=None, reload=False):
     res["servidor"] = ctx.posts_since(idx)
     res["screenshot"] = ctx.shot(drv, cenario)
     res["console"] = console_logs(drv, ctx.nav)
+    if "status" not in res and not lab:
+        # the probe page never ran: did the driver even reach the URL?
+        try:
+            res["url_atual"] = drv.current_url
+        except WebDriverException as e:
+            res["url_atual"] = f"(erro: {first_line(e)})"
+        target = url or res.get("url_atual") or ""
+        if not reload and not str(res["url_atual"]).startswith(target.split("#")[0]):
+            res.update(ambiente("driver não navegou até a página", f"url atual: {res['url_atual']}"))
     if "status" not in res:
         res.update(ok() if lab and lab.get("fim") else falha("página não terminou em 30 s"))
+    return res
+
+
+# ---------------------------------------------------------------- Safari as a person opens it (`open -a Safari`)
+def relatos_since(server, idx):
+    with server.lock:
+        return [e for e in server.entries[idx:] if e["metodo"] == "GET" and e["caminho"].startswith("/relato")]
+
+
+def safari_open_scenario(ctx, cenario, url):
+    """Open the URL in the user's Safari (not a WebDriver session); the page reports __lab to /relato."""
+    from urllib.parse import parse_qs, urlparse
+    with ctx.server.lock:
+        idx = len(ctx.server.entries)
+    t0 = time.time()
+    res = {"cenario": cenario, "url": url, "modo": "open -a Safari"}
+    p = subprocess.run(["open", "-a", "Safari", url], capture_output=True, text=True, timeout=30)
+    if p.returncode != 0:
+        res.update(ambiente("open -a Safari falhou", (p.stderr or p.stdout).strip()[:300]))
+        return res
+    lab = None
+    while time.time() - t0 < TIMEOUT:
+        rel = relatos_since(ctx.server, idx)
+        if rel:
+            try:
+                lab = json.loads(parse_qs(urlparse(rel[0]["caminho"]).query)["d"][0])
+            except (KeyError, ValueError, IndexError) as e:
+                res["relato_ilegivel"] = str(e)
+            break
+        time.sleep(0.5)
+    time.sleep(1)
+    name = f"{ctx.so}-{ctx.nav}-{cenario}.png"
+    screen_capture(ctx.out / name)
+    res.update({"lab": lab, "segundos": round(time.time() - t0, 1), "servidor": ctx.posts_since(idx),
+                "screenshot": name, "console": None})
+    res.update(ok() if lab and lab.get("fim") else
+               ambiente("sem relato da página em 30 s", "a página não reportou; ver o screenshot"))
+    return res
+
+
+def quit_safari():
+    time.sleep(3)  # let WebKit write localStorage to disk
+    how = "osascript quit"
+    try:
+        subprocess.run(["osascript", "-e", 'quit app "Safari"'], capture_output=True, timeout=15)
+    except subprocess.TimeoutExpired:
+        how = "osascript sem resposta"
+    for _ in range(20):
+        if subprocess.run(["pgrep", "-x", "Safari"], capture_output=True).returncode != 0:
+            return how
+        time.sleep(0.5)
+    subprocess.run(["pkill", "-x", "Safari"], capture_output=True)
+    time.sleep(2)
+    return how + " + pkill"
+
+
+def run_safari(res, so, out, server):
+    """Safari: file/http scenarios in the user's own Safari via `open` (WebDriver cannot open file:// and its
+    sessions start with empty storage), then the real panel in a WebDriver session (it needs clicks)."""
+    ctx = Ctx(so, "safari", out, server)
+    sc = res["cenarios"]
+    try:
+        res["versao"] = subprocess.run(["defaults", "read", "/Applications/Safari.app/Contents/Info",
+                                        "CFBundleShortVersionString"], capture_output=True, text=True,
+                                       timeout=15).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        pass
+    file_index = (PROBE / "index.html").as_uri()
+    file_leitor = (PROBE / "outra-pasta" / "leitor.html").as_uri()
+    http_index = f"http://127.0.0.1:{PORT}/probe/index.html"
+    subprocess.run(["pkill", "-x", "Safari"], capture_output=True)
+    time.sleep(1)
+    sc["ARQUIVO"] = safari_open_scenario(ctx, "ARQUIVO", file_index)
+    sc["ARQUIVO_RECARREGAR"] = safari_open_scenario(ctx, "ARQUIVO_RECARREGAR", file_index)  # loads it again
+    sc["ARQUIVO_OUTRA_PASTA"] = safari_open_scenario(ctx, "ARQUIVO_OUTRA_PASTA", file_leitor)
+    sc["HTTP"] = safari_open_scenario(ctx, "HTTP", http_index)
+    res["fechamento_1"] = quit_safari()
+    sc["ARQUIVO_REABRIR"] = safari_open_scenario(ctx, "ARQUIVO_REABRIR", file_index)
+    sc["HTTP_REABRIR"] = safari_open_scenario(ctx, "HTTP_REABRIR", http_index)
+    res["fechamento_2"] = quit_safari()
+    try:
+        drv = start_driver("safari", None, None)
+    except Exception as e:  # noqa: BLE001
+        sc["PAINEL_REAL_HTTP"] = {"feito": ambiente("safaridriver não iniciou", first_line(e)),
+                                  "desfazer": ambiente("safaridriver não iniciou", first_line(e))}
+    else:
+        res["versao_webdriver"] = drv.capabilities.get("browserVersion")
+        try:
+            sc["PAINEL_REAL_HTTP"] = painel_real(ctx, drv)
+        finally:
+            quit_driver(drv)
+    res["medidas"] = measures(sc)
     return res
 
 
@@ -433,6 +534,8 @@ def run_browser(nav, so, out, server, tmp_root):
     res["binario"] = binary
     if not binary:
         return all_env(res, "não instalado")
+    if nav == "safari":
+        return run_safari(res, so, out, server)
     brave_driver = None
     if nav == "brave":
         raw, major = brave_version(binary)

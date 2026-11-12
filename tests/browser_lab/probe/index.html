@@ -66,7 +66,16 @@
   window.__lab.erros = window.__erros.slice();
   window.__lab.fim = true;
   document.getElementById("saida").textContent = JSON.stringify(window.__lab, null, 2);
+  relato();
 })();
+// report channel for browsers driven without WebDriver (Safari via `open`): an image GET, no CORS involved
+function relato() {
+  try {
+    var im = new Image();
+    im.src = LAB.url + "/relato?d=" + encodeURIComponent(JSON.stringify(window.__lab));
+    window.__relato = im;
+  } catch (e) { /* no config: nothing to report to */ }
+}
 </script>
 </body>
 </html>

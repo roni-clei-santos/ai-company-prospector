@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Sonda do laboratório: leitor</title>
+<script src="../config.js"></script>
 </head>
 <body>
 <h1>Leitor (outra pasta)</h1>
@@ -25,6 +26,10 @@
   window.__lab.erros = window.__erros.slice();
   window.__lab.fim = true;
   document.getElementById("saida").textContent = JSON.stringify(window.__lab, null, 2);
+  try {  // report channel for Safari via `open` (image GET, no CORS involved)
+    window.__relato = new Image();
+    window.__relato.src = LAB.url + "/relato?d=" + encodeURIComponent(JSON.stringify(window.__lab));
+  } catch (e) { /* no config */ }
 </script>
 </body>
 </html>

@@ -5,6 +5,7 @@
   POST /feito      -> 200 {"ok": true} with the right X-Painel-Token (read from probe/config.js), else 403
   GET  /probe/...  -> files of tests/browser_lab/probe/
   GET  /painel/... -> files of --painel <folder> (optional)
+  GET  /relato?d=  -> a probe page reporting its window.__lab (used for Safari driven via `open`)
 
 Every request is appended to <log> (results/server-log.json).
 Usage: python tests/browser_lab/probe_server.py [port] [--log results/server-log.json] [--painel <folder>]
@@ -21,6 +22,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PROBE = HERE / "probe"
 CONFIG = PROBE / "config.js"
+GIF = b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;"
 
 
 def read_token(config=CONFIG):
@@ -103,6 +105,9 @@ def make_server(port=47321, log_path=Path("results/server-log.json"), painel_dir
 
         def do_GET(self):
             path = self.path.split("?", 1)[0].split("#", 1)[0]
+            if path == "/relato":  # a probe page reporting window.__lab (Safari driven via `open`)
+                self._record(200)
+                return self._send(200, GIF, "image/gif")
             base, rel = None, None
             if path.startswith("/probe/"):
                 base, rel = PROBE, path[len("/probe/"):]
