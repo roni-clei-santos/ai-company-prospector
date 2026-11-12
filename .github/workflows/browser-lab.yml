@@ -1,0 +1,110 @@
+name: browser-lab
+
+# Lab only: measures how each browser handles the panel opened from file:// and from http://127.0.0.1.
+# Fictitious data only. A browser result never fails the job; only a crash of the lab itself does.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "painel/**"
+      - "scripts/gerar_painel.py"
+      - "scripts/servidor_painel.py"
+      - "tests/browser_lab/**"
+      - ".github/workflows/browser-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    name: lab ${{ matrix.so }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            so: macos
+            browsers: safari,chrome,edge,firefox,brave
+          - os: windows-latest
+            so: windows
+            browsers: chrome,edge,firefox,brave
+          - os: ubuntu-latest
+            so: ubuntu
+            browsers: chrome,firefox
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Selenium (+ openpyxl for the fictitious project of the real panel)
+        run: python -m pip install "selenium>=4.20,<5" openpyxl
+
+      - name: Safari driver (macOS)
+        if: runner.os == 'macOS'
+        run: sudo safaridriver --enable
+
+      - name: Brave (macOS)
+        id: brave_mac
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: brew install --cask brave-browser
+
+      - name: Brave (Windows)
+        id: brave_win
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: choco install brave -y --no-progress
+
+      - name: Lab (macOS / Windows, headed)
+        if: runner.os != 'Linux'
+        env:
+          BRAVE_INSTALL: ${{ steps.brave_mac.outcome }}${{ steps.brave_win.outcome }}
+        run: python tests/browser_lab/run_lab.py --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
+
+      - name: Lab (Linux, headed inside xvfb)
+        if: runner.os == 'Linux'
+        run: |
+          command -v xvfb-run >/dev/null || (sudo apt-get update && sudo apt-get install -y xvfb)
+          xvfb-run -a -s "-screen 0 1440x900x24" \
+            python tests/browser_lab/run_lab.py --so ${{ matrix.so }} --browsers "${{ matrix.browsers }}" --out results
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: browser-lab-${{ matrix.so }}
+          path: results/
+          if-no-files-found: warn
+
+  resumo:
+    needs: lab
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: browser-lab-*
+          path: artefatos
+
+      - name: Table
+        run: |
+          python tests/browser_lab/summarize.py artefatos resumo.md
+          cat resumo.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: browser-lab-resumo
+          path: resumo.md

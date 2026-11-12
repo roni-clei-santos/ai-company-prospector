@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Sonda do laboratório: leitor</title>
+</head>
+<body>
+<h1>Leitor (outra pasta)</h1>
+<pre id="saida">rodando...</pre>
+<script>
+  // Only reads what index.html stored: does another file share the same storage?
+  window.__lab = {};
+  window.__erros = [];
+  window.onerror = function (m, s, l) { window.__erros.push(String(m) + " @" + s + ":" + l); };
+  try {
+    var v = localStorage.getItem("lab-fila");
+    window.__lab.leitura = { ok: v === "[\"teste-1\"]", detalhe: v === null ? "null" : v };
+  } catch (e) {
+    window.__lab.leitura = { ok: false, detalhe: (e && e.name ? e.name + ": " : "") + (e && e.message ? e.message : String(e)) };
+  }
+  try {
+    window.__lab.ambiente = { ok: true, detalhe: JSON.stringify({ protocol: location.protocol, origin: location.origin,
+      isSecureContext: window.isSecureContext }) };
+  } catch (e) { window.__lab.ambiente = { ok: false, detalhe: String(e) }; }
+  window.__lab.erros = window.__erros.slice();
+  window.__lab.fim = true;
+  document.getElementById("saida").textContent = JSON.stringify(window.__lab, null, 2);
+</script>
+</body>
+</html>
