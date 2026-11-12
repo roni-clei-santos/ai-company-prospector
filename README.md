@@ -138,7 +138,7 @@ Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na 
 | Sistema | Você precisa de |
 |---|---|
 | Todos | [Claude Code](https://code.claude.com/docs/en/setup) logado e Git |
-| Só no modo "Planilha + robô" | Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn logada nesse Chrome |
+| Só no modo "Planilha + robô" | Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn logada nesse Chrome. O Gmail logado só é preciso se você escolher `modo_email: "gmail_rascunho"`; com `"arquivo"`, os e-mails ficam em `rascunhos/email/` |
 | macOS 13+ | [Homebrew](https://brew.sh) (o instalador cuida do Python 3 e do RTK) |
 | Linux | `sudo` e `apt`, `dnf` ou `pacman`, ou Python 3.9+ com `pip` já instalados |
 | Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) ou `winget install Python.Python.3.12`) |

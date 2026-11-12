@@ -134,4 +134,4 @@ else
 fi
 
 echo
-echo "Pronto. Abra o Claude Code nesta pasta, rode /chrome, entre no LinkedIn e depois /build-company-list."
+echo "Pronto. Abra o Claude Code nesta pasta e rode /build-company-list. Para o robô, rode /chrome, entre no LinkedIn e depois /next-companies."

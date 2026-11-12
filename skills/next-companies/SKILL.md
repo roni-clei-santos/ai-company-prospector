@@ -11,7 +11,7 @@ Tudo sobre o CANDIDATO está em `perfil.local.md` (o PERFIL). Nunca escreva dado
 
 ## Passo 0 — Preflight (pare se falhar)
 
-1. Leia e siga, nesta ordem, `skills/_shared/preflight-basico.md` (pasta e perfil) e `skills/_shared/preflight-linkedin.md` (Chrome conectado, LinkedIn logado e, se `modo_email` = "gmail_rascunho", Gmail logado).
+1. Leia e siga, nesta ordem, `skills/_shared/preflight-basico.md` (pasta e perfil) e `skills/_shared/preflight-linkedin.md` (Chrome conectado e LinkedIn logado; o Gmail só é conferido se `modo_email` = "gmail_rascunho").
 2. Confira se existe `controle/progresso.json`. Se não existir, PARE e responda: "Não achei o controle/progresso.json. Rode /build-company-list primeiro (ou copie a planilha de empresas para cá e rode de novo)."
 3. Se `progresso.json` não for um JSON válido, PARE e responda: "O controle/progresso.json está corrompido; não mexi em nada. Para restaurar a última versão boa, veja docs/guia/07-faq-e-erros.md." Mostre a linha do erro.
 

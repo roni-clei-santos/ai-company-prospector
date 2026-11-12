@@ -17,7 +17,8 @@ Siga na ordem. Se um item falhar, PARE com a mensagem exata indicada e não alte
 2. Se a página cair na tela de login (URL com `/login`, `/authwall`, `/checkpoint` ou `/uas/login`, ou um formulário "Entrar"/"Sign in"), PARE com:
    "Entre no LinkedIn nessa aba do Chrome e digite: pronto."
 3. Espere a pessoa digitar "pronto". Recarregue `https://www.linkedin.com/feed/` e confira de novo. Repita até estar logado.
-4. Se `modo_email` = "gmail_rascunho": abra `https://mail.google.com/` na mesma aba e confira se está logado na conta do campo `email`. Se não estiver, PARE com: "Entre no Gmail (conta <email>) nessa aba do Chrome e digite: pronto."
+4. Gmail: SÓ se `modo_email` = "gmail_rascunho". Abra `https://mail.google.com/` na mesma aba e confira se está logado na conta do campo `email`. Se não estiver, PARE com: "Entre no Gmail (conta <email>) nessa aba do Chrome e digite: pronto."
+   Com `modo_email` = "arquivo", NÃO abra o Gmail nem confira nada nele: este preflight confere só o Chrome (item a) e o LinkedIn (itens 1 a 3).
 
 ## Regra de LinkedIn (vale em TODA a skill)
 

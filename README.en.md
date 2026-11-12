@@ -138,7 +138,7 @@ Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the f
 | System | You need |
 |---|---|
 | All | [Claude Code](https://code.claude.com/docs/en/setup) logged in and Git |
-| "Spreadsheet + robot" only | Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account logged in on that Chrome |
+| "Spreadsheet + robot" only | Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account logged in on that Chrome. A logged-in Gmail is only needed if you choose `modo_email: "gmail_rascunho"`; with `"arquivo"`, emails stay in `rascunhos/email/` |
 | macOS 13+ | [Homebrew](https://brew.sh) (the installer takes care of Python 3 and RTK) |
 | Linux | `sudo` and `apt`, `dnf` or `pacman`, or Python 3.9+ with `pip` already installed |
 | Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.12`) |
