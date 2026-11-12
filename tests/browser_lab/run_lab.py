@@ -313,7 +313,7 @@ def painel_real(ctx, drv):
                     v = fn()
                     if v:
                         return v
-                except WebDriverException:
+                except (WebDriverException, IndexError):  # IndexError: element not there yet
                     pass
                 time.sleep(0.4)
             return None
