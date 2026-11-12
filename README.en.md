@@ -189,17 +189,21 @@ LinkedIn's terms restrict automation. This project only reads, in the person's o
 
 ## Stars and contributors
 
+<p align="center">
 <a href="https://star-history.com/#roni-clei-santos/ai-company-prospector&Date">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date&theme=dark">
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date">
-    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date" width="100%">
+    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date" width="640">
   </picture>
 </a>
+</p>
 
+<p align="center">
 <a href="https://github.com/roni-clei-santos/ai-company-prospector/graphs/contributors">
   <img alt="Contributors" src="https://contrib.rocks/image?repo=roni-clei-santos/ai-company-prospector">
 </a>
+</p>
 
 Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) and the [ROADMAP.md](ROADMAP.md). Run the tests with `python3 -m pytest`.
 

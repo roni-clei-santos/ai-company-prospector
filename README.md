@@ -189,17 +189,21 @@ Os termos do LinkedIn restringem automação. Este projeto só lê, no navegador
 
 ## Estrelas e contribuidores
 
+<p align="center">
 <a href="https://star-history.com/#roni-clei-santos/ai-company-prospector&Date">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date&theme=dark">
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date">
-    <img alt="Gráfico de estrelas" src="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date" width="100%">
+    <img alt="Gráfico de estrelas" src="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date" width="640">
   </picture>
 </a>
+</p>
 
+<p align="center">
 <a href="https://github.com/roni-clei-santos/ai-company-prospector/graphs/contributors">
   <img alt="Contribuidores" src="https://contrib.rocks/image?repo=roni-clei-santos/ai-company-prospector">
 </a>
+</p>
 
 Quer ajudar? Veja o [CONTRIBUTING.md](CONTRIBUTING.md) e o [ROADMAP.md](ROADMAP.md). Os testes rodam com `python3 -m pytest`.
 
