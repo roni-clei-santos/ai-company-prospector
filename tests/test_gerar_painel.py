@@ -4,6 +4,7 @@ Each case checks painel/data.json and the HTML rendered by painel/index.html (vi
 skipped when Chrome is not installed).
 """
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -17,6 +18,8 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 import gerar_painel  # noqa: E402
+
+SKIP_RENDER_REASON = "Chrome headless trava no runner macOS do GitHub; renderização testada nos outros sistemas"
 
 CHROME = next((p for p in [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -83,6 +86,12 @@ def render(tmp_path):
                               "--no-first-run", "--no-default-browser-check", "--virtual-time-budget=3000",
                               "--dump-dom", (tmp_path / "painel" / "index.html").as_uri()],
                              capture_output=True, text=True, timeout=30).stdout
+    except subprocess.TimeoutExpired:
+        # Only skip on GitHub Actions AND macOS (both at once); anywhere else the render stays mandatory.
+        # The panel data assertions in each test run before render(), so they always run.
+        if os.environ.get("CI") == "true" and sys.platform == "darwin":
+            pytest.skip(SKIP_RENDER_REASON)
+        raise
     finally:
         shutil.rmtree(profile, ignore_errors=True)
     m = re.search(r'<ol class="todo">(.*?)</ol>', out, re.S)

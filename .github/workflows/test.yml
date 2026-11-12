@@ -38,7 +38,7 @@ jobs:
           test -L "$HOME/.claude/skills/next-companies"
           test -L "$HOME/.claude/skills/build-company-list"
           test -f perfil.local.md
-          python -m pytest -q
+          python -m pytest -q -rs
           python .github/ci/projeto_demo.py "$RUNNER_TEMP/proj"
           cd "$RUNNER_TEMP/proj"
           python "$GITHUB_WORKSPACE/scripts/gerar_painel.py" --no-open
@@ -62,7 +62,7 @@ jobs:
             if (-not (Test-Path "$env:USERPROFILE\.claude\skills\$s\.installed-from")) { throw "skill $s without .installed-from" }
           }
           if (-not (Test-Path .\perfil.local.md)) { throw "perfil.local.md not created" }
-          python -m pytest -q
+          python -m pytest -q -rs
           if ($LASTEXITCODE -ne 0) { throw "pytest exit $LASTEXITCODE" }
           $proj = Join-Path $env:RUNNER_TEMP 'proj'
           python .github\ci\projeto_demo.py $proj
