@@ -135,6 +135,8 @@ def make_handler(root, token, today=None):
             self._send(code, json.dumps(obj, ensure_ascii=False))
 
         def _deny(self):
+            print(f"recusado: {self.command} {self.path.split('?', 1)[0]} Origin={self.headers.get('Origin')} "
+                  f"Sec-Fetch-Site={self.headers.get('Sec-Fetch-Site')}", file=sys.stderr, flush=True)
             self._json(403, {"ok": False, "erro": "acesso só pelo próprio painel"})
 
         def _data(self):
@@ -187,7 +189,10 @@ def make_handler(root, token, today=None):
                 body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
             except (ValueError, UnicodeDecodeError):
                 body = None
-            if not self._host_ok() or not self._origin_ok(required=True) or not self._same_page() or not self._token_ok(body):
+            # every POST needs the token; the Origin, when sent, must be this server. Only the beacon of a closed
+            # tab (/api/fechou) may come without Origin: some browsers (Firefox) do not send it on sendBeacon.
+            if (not self._host_ok() or not self._origin_ok(required=path != "/api/fechou") or not self._same_page()
+                    or not self._token_ok(body)):
                 return self._deny()
             if not isinstance(body, dict):
                 return self._json(400, {"ok": False, "erro": "pedido inválido"})
@@ -198,6 +203,8 @@ def make_handler(root, token, today=None):
                     now = time.time()
                     if not any(now - t < PAGE_ALIVE_S for t in self.server.pages.values()):
                         self.server.closing_at = now + CLOSED_S
+                print(f"aba fechada ({page_id or 'sem id'}); desliga em {int(CLOSED_S)} s se nada mais chegar",
+                      file=sys.stderr, flush=True)
                 return self._json(200, {"ok": True})
             self._activity()
             if path == "/api/estado":

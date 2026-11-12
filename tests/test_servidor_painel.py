@@ -248,10 +248,13 @@ def _token(url):
         return re.search(r'token: "([^"]+)"', r.read().decode("utf-8")).group(1)
 
 
-def _post(url, body, token):
-    origin = url.rstrip("/")
-    req = urllib.request.Request(origin + "/api/" + body.pop("_rota"), data=json.dumps(dict(body, token=token)).encode(),
-                                 headers={"Content-Type": "application/json", "Origin": origin}, method="POST")
+def _post(url, body, token, origin=True):
+    base = url.rstrip("/")
+    headers = {"Content-Type": "application/json"}
+    if origin:
+        headers["Origin"] = base
+    req = urllib.request.Request(base + "/api/" + body.pop("_rota"), data=json.dumps(dict(body, token=token)).encode(),
+                                 headers=headers, method="POST")
     with urllib.request.urlopen(req, timeout=5) as r:
         return r.status
 
@@ -288,7 +291,7 @@ def test_stops_when_the_tab_is_closed(tmp_path, monkeypatch):
     token = _token(url)
     assert _post(url, {"_rota": "estado", "pagina": "aba1"}, token) == 200
     t0 = time.time()
-    assert _post(url, {"_rota": "fechou", "pagina": "aba1"}, token) == 200
+    assert _post(url, {"_rota": "fechou", "pagina": "aba1"}, token, origin=False) == 200  # Firefox's beacon: no Origin
     assert _ends(proc, tmp_path, 20), (tmp_path / "srv.log").read_text(errors="replace")
     assert time.time() - t0 <= 20
     assert gerar_painel.panel_url(tmp_path) is None

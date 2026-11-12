@@ -595,8 +595,10 @@ def cenario_d(ctx):
         if not wait(lambda: pg.js("return document.querySelector('details.after').open"), 3):
             bad.append("Outra versão não abriu")
         pg.click("details.after button[data-copy]")
-        if wait(lambda: pg.js("return document.querySelector('details.after button[data-copy]').textContent"), 3) != "Copiado ✓":
-            bad.append("Copiar da outra versão não confirmou")
+        label2 = wait(lambda: pg.js("const b = document.querySelector('details.after button[data-copy]'); "
+                                    "return /Copiado|Não copiou/.test(b.textContent) ? b.textContent : null"), 3)
+        if label2 != "Copiado ✓":
+            bad.append(f"Copiar da outra versão: {label2!r}")
         if cats.get("ver-detalhes"):
             pg.click("details.seal > summary")
             if not pg.js("return document.querySelector('details.seal').open"):
@@ -728,7 +730,9 @@ def cenario_g(ctx):
         t0 = time.time()
         gone = wait(lambda: wait_pid_dead(proj.pid) and not (proj.root / "controle" / ".painel-servidor.json").exists(), 20, step=0.5)
         if not gone:
-            raise Falha("fechou a aba: o servidor não terminou em 20 s")
+            log = proj.root / "controle" / ".painel-servidor.log"
+            raise Falha("fechou a aba: o servidor não terminou em 20 s. Log do servidor: "
+                        + (log.read_text(errors="replace")[-600:] if log.exists() else "(sem log)"))
         return [f"fechou a aba: servidor terminou e apagou o .painel-servidor.json em {round(time.time() - t0, 1)} s"]
     finally:
         ctx.finish("G")
