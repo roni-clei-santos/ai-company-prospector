@@ -27,7 +27,7 @@
   <a href="https://code.claude.com/docs/en/overview"><img alt="Feito para o Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
 </p>
 
-https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
+<p align="center"><a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><img src="assets/demo.gif" alt="Painel da demonstração: aba Pendentes, Esta rodada, Projeto inteiro, Responderam e Follow-ups (dados fictícios)" width="100%"></a></p>
 
 <p align="center"><sub>Painel da demonstração, com dados 100% fictícios. <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Abra a demo ao vivo</a>.</sub></p>
 
@@ -61,7 +61,7 @@ https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icons/rascunhos.svg" width="40" alt=""><br><b>Rascunhos que você revisa</b><br>Mensagens de LinkedIn e e-mails no seu tom de voz, salvos como rascunho para você ler e enviar.</td>
-    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Painel automático</b><br>Ao fim de cada rodada abre um painel com a rodada, o projeto inteiro, quem respondeu e os follow-ups.</td>
+    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Painel com tudo o que falta</b><br>A aba <b>Pendentes</b> junta, de todas as rodadas, as mensagens de LinkedIn (texto pronto e botão de copiar), os e-mails, os follow-ups vencidos e as suas decisões. O <code>/painel</code> atualiza a lista sem gastar uma rodada.</td>
     <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Economia de tokens com RTK</b><br>O instalador liga o <a href="https://github.com/rtk-ai/rtk">RTK</a>, que enxuga a saída dos comandos antes de ela chegar ao Claude.</td>
   </tr>
   <tr>
@@ -150,7 +150,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 O `install.ps1` confere o Python (`py -3` ou `python`), instala o RTK com o `winget` e **copia** as skills para `%USERPROFILE%\.claude\skills`. Depois de cada `git pull`, rode `py -3 scripts\atualizar_skills.py` para copiar a versão nova.
 </details>
 
-Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na pasta (`claude`) e rode **`/build-company-list`** para receber a planilha (não precisa de LinkedIn). Para o modo "Planilha + robô": rode `/chrome`, entre no LinkedIn nesse Chrome e rode **`/next-companies`** a cada rodada.
+Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na pasta (`claude`) e rode **`/build-company-list`** para receber a planilha (não precisa de LinkedIn). Para o modo "Planilha + robô": rode `/chrome`, entre no LinkedIn nesse Chrome e rode **`/next-companies`** a cada rodada. Entre uma rodada e outra, **`/painel`** confere o que você já enviou e atualiza a aba Pendentes do painel, sem processar empresa nenhuma ([guia do painel](docs/guia/06-painel.md)).
 
 ## Requisitos
 

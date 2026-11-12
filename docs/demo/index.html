@@ -111,12 +111,69 @@
   .empty { color: var(--ink-3); font-size: 14px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
 
   footer { margin-top: 40px; padding: 18px 0 26px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+  footer .author { margin-top: 6px; }
+  footer .author a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+  footer .author a:hover { color: var(--orange); text-decoration-color: var(--orange); }
   .pride { height: 4px; background: linear-gradient(90deg, #E40303, #FF8C00, #FFED00, #008026, #24408E, #732982); }
 
   .fade { animation: fade .5s ease both; }
   @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
   .loading { padding: 80px 0; text-align: center; color: var(--ink-3); }
+  section[hidden] { display: none; }
+
+  /* ---------- Pendentes ---------- */
+  .hero { padding: 22px; }
+  .hero .label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .hero .big { margin: 8px 0 14px; font-size: clamp(20px, 3vw, 28px); line-height: 1.3; font-weight: 700; letter-spacing: -.01em; }
+  .hero .big b { color: var(--orange); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--navy-3); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chip b { color: var(--orange); font-variant-numeric: tabular-nums; }
+  .chip:hover { border-color: var(--ink-3); }
+  .check-line { margin-top: 12px; color: var(--ink-3); font-size: 12px; }
+  .check-line.bad { color: var(--warn); }
+  h2.group { margin-top: 30px; scroll-margin-top: 64px; }
+  h2.group .count { display: inline-block; min-width: 26px; padding: 1px 9px; border-radius: 999px; background: var(--orange-soft); color: var(--orange); font-size: 13px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+  .task { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 16px; border-radius: 12px; background: var(--navy-2); border: 1px solid var(--line); transition: opacity .2s; }
+  .task .n { min-width: 34px; height: 34px; padding: 0 6px; border-radius: 10px; background: var(--navy-3); display: grid; place-items: center; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .task .n.due { background: var(--orange); color: var(--navy); }
+  .task .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .task .company { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .task .who { margin-top: 2px; font-size: 15px; }
+  .task .who b { font-weight: 700; }
+  .task .who span { color: var(--ink-2); }
+  .task .meta { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+  .msg { margin: 10px 0 0; padding: 12px 14px; border-left: 3px solid var(--orange); border-radius: 0 10px 10px 0; background: var(--navy); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .msg-label { margin-top: 10px; color: var(--ink-3); font-size: 12px; font-weight: 600; }
+  details.after { margin-top: 10px; }
+  details.after summary { cursor: pointer; color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--navy-3); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn.primary { background: var(--orange); border-color: var(--orange); color: var(--navy); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.copied { background: var(--ok); border-color: var(--ok); color: var(--navy); }
+  .pill.kind-convite::before { background: var(--warn); }
+  .pill.kind-mensagem::before { background: var(--ok); }
+  .done-box { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 9px; border: 1px solid var(--line); color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+  .done-box input { width: 16px; height: 16px; accent-color: var(--ok); margin: 0; cursor: pointer; }
+  .task.done { opacity: .5; }
+  .task.done .head, .task.done .who, .task.done .msg, .task.done .meta, .task.done .line { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+  .task.done .done-box { color: var(--ok); border-color: var(--ok); }
+  .line { font-size: 14px; }
+  .mode-line { margin: 0 0 12px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--navy-2); color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .mode-line.on { border-color: rgba(61, 214, 140, .45); color: var(--ok); }
+  .mode-line.bad { border-color: rgba(255, 193, 69, .5); color: var(--warn); }
+  .done-box.off { opacity: .55; cursor: not-allowed; }
+  .done-box.off input { cursor: not-allowed; }
+  .task .n.ok { background: var(--ok); color: var(--navy); }
+  .task.sent { opacity: .9; }
+  .line code { color: var(--ink-2); }
+  @media (max-width: 640px) {
+    .task { grid-template-columns: auto minmax(0, 1fr); }
+    .task .done-box { grid-column: 2; justify-self: start; }
+  }
 </style>
 </head>
 <body>
@@ -130,7 +187,8 @@
 
 <nav class="tabs" aria-label="Seções">
   <div class="wrap">
-    <a href="#rodada" class="on">Esta rodada</a>
+    <a href="#pendentes" class="on">Pendentes</a>
+    <a href="#rodada">Esta rodada</a>
     <a href="#projeto">Projeto inteiro</a>
     <a href="#responderam">Responderam</a>
     <a href="#followups">Follow-ups com data</a>
@@ -143,7 +201,8 @@
 
 <div id="tip" role="tooltip"></div>
 <footer>
-  <div class="wrap" id="foot">Gerado por <code>scripts/gerar_painel.py</code>. A IA rascunha, você decide e envia.</div>
+  <div class="wrap" id="foot">Gerado por <code>scripts/gerar_painel.py</code>. A IA rascunha, você decide e envia.
+    <div class="author">Feito por Roni Clei Santos · <a href="https://www.linkedin.com/in/roni-clei-santos/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">Dar uma estrela no projeto</a></div></div>
 </footer>
 <div class="pride" aria-hidden="true"></div>
 
@@ -246,8 +305,159 @@
       <div class="chart">${svg}</div>${tableView(head, rows)}</div>`;
   }
 
+  // ---------- "Feito": the candidate's click is the source of truth ----------
+  // servidor: opened by /painel (scripts/servidor_painel.py) -> POST records the item as sent;
+  // demo: GitHub Pages -> only strikes the item on screen; arquivo: opened from disk -> disabled.
+  let MODE = "arquivo";
+  const SERVER = window.PAINEL_SERVIDOR || null;
+  async function api(path, id) {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Painel-Token": SERVER.token }, body: JSON.stringify({ id }) });
+    const out = await r.json().catch(() => ({ ok: false, erro: "resposta inválida do servidor" }));
+    if (!r.ok || !out.ok) throw new Error(out.erro || ("erro " + r.status));
+    return out;
+  }
+
+  // ---------- copy to clipboard (works from file:// too) ----------
+  const COPY = [];
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext !== false) {
+      return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    }
+    return Promise.resolve(fallbackCopy(text));
+  }
+  function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } finally { ta.remove(); }
+  }
+  const copyBtn = (text, lbl) => { COPY.push(text); return `<button class="btn primary copy" type="button" data-copy="${COPY.length - 1}">${esc(lbl || "Copiar texto")}</button>`; };
+
+  const plural = (n, one, many) => `<b>${n}</b> ${n === 1 ? one : many}`;
+  const joinPt = parts => parts.length < 2 ? parts.join("") : parts.slice(0, -1).join(", ") + " e " + parts[parts.length - 1];
+  const cap = s => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const OFF_HINT = "Abra pelo /painel para registrar";
+  const doneBox = id => MODE === "arquivo"
+    ? `<label class="done-box off" title="${OFF_HINT}"><input type="checkbox" data-done="${esc(id)}" disabled> Feito</label>`
+    : `<label class="done-box"${MODE === "demo" ? ' title="Demonstração: só risca na tela"' : ""}><input type="checkbox" data-done="${esc(id)}"> Feito</label>`;
+  const task = (id, n, body, due) => `<article class="task" data-id="${esc(id)}"><div class="n${due ? " due" : ""}">${n}</div><div>${body}</div>${doneBox(id)}</article>`;
+  const nothing = `<div class="empty">Nada pendente aqui</div>`;
+  const company = it => it.numero != null ? `#${esc(it.numero)}${it.empresa ? " " + esc(it.empresa) : ""}` : esc(it.empresa || "");
+  const fuId = f => f.id || ("fu:" + ((f.numeros && f.numeros.length) ? f.numeros.join(",") : f.quem) + ":" + f.data);
+  const KIND = { linkedin: "LinkedIn", email: "E-mail", followup: "Follow-up", resposta: "Resposta", decisao: "Decisão" };
+  const MODE_LINE = {
+    servidor: `<div class="mode-line on">Marcou como Feito, está registrado.</div>`,
+    arquivo: `<div class="mode-line">${OFF_HINT}: aberto direto do arquivo, o "Feito" fica desativado.</div>`,
+    demo: `<div class="mode-line">Demonstração: o "Feito" só risca o item na tela.</div>`
+  };
+
+  function renderPending(d) {
+    const p = d.pendentes;
+    if (!p) return `<section id="pendentes" class="fade"><div class="empty">Este painel foi gerado por uma versão antiga do script. Rode <code>python3 scripts/gerar_painel.py</code> de novo para ver os pendentes.</div></section>`;
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const due = (d.followups || []).filter(f => f.data <= today);
+    const replies = p.respostas || [], li = p.linkedin || [], em = p.emails || [], dec = p.decisoes || [], sent = p.enviados_hoje || [];
+    const totals = joinPt([plural(li.length, "mensagem de LinkedIn", "mensagens de LinkedIn"), plural(em.length, "e-mail", "e-mails"),
+      plural(due.length, "follow-up vencido", "follow-ups vencidos"), plural(dec.length, "decisão sua", "decisões suas")]);
+    const c = p.conferencia || {};
+    const checkOk = c.linkedin_secao4 == null || c.linkedin_secao4 === c.linkedin_painel + (c.ocultos_nao_contatar || 0);
+    const check = c.fonte ? `<div class="check-line${checkOk ? "" : " bad"}">Conferência: ${esc(c.linkedin_secao4)} pessoas sem ✅ e sem "NÃO ENVIAR" na seção 4 do <code>${esc(c.fonte)}</code> · ${esc(c.linkedin_painel)} nesta lista${c.ocultos_nao_contatar ? ` · ${esc(c.ocultos_nao_contatar)} escondidas por NAO_CONTATAR` : ""}${checkOk ? "" : " · os números não batem: rode /painel"}</div>` : "";
+    const chip = (target, n, lbl) => `<button class="chip" type="button" data-jump="${target}"><b>${n}</b> ${esc(lbl)}</button>`;
+    let h = `<section id="pendentes" class="fade">
+      ${MODE_LINE[MODE]}<div id="acao-status" class="mode-line" role="status" hidden></div>
+      <div class="card hero"><div class="label">O que falta você fazer, de todas as rodadas</div>
+        <p class="big">${totals}</p>
+        <div class="chips">${chip("p-hoje", due.length + replies.length, "Fazer hoje")}${chip("p-linkedin", li.length, "LinkedIn")}${chip("p-emails", em.length, "E-mails")}${chip("p-decisoes", dec.length, "Decisões suas")}${MODE === "servidor" ? chip("p-enviados", sent.length, "Enviados hoje") : ""}</div>
+        ${check}
+      </div>`;
+
+    // b) Fazer hoje
+    const hoje = due.map(f => task(fuId(f), esc(short(f.data)), `<div class="head"><span class="pill s-good">Follow-up</span><span class="company">${f.data < today ? "venceu em " + esc(br(f.data)) : "vence hoje"}</span></div>
+        <div class="who"><b>${esc(f.quem)}</b></div><div class="meta">Só se ainda não houver resposta. Marcado na rodada de ${esc(br(f.rodada))}.</div>`, true))
+      .concat(replies.map(r => task(r.id, "↩", `<div class="head"><span class="pill s-good">Resposta</span><span class="company">vista na rodada de ${esc(br(r.rodada))}</span></div>
+        <div class="who">${esc(r.texto)}</div><div class="meta">Pede uma ação sua.</div>`, true)));
+    h += `<h2 class="group" id="p-hoje">Fazer hoje <span class="count">${hoje.length}</span><small>follow-ups vencidos e respostas que pedem ação</small></h2>
+      ${hoje.length ? `<div class="list">${hoje.join("")}</div>` : nothing}`;
+
+    // c) LinkedIn
+    h += `<h2 class="group" id="p-linkedin">LinkedIn <span class="count">${li.length}</span><small>na ordem de prioridade do PROMPT (seção 6)</small></h2>`;
+    h += li.length ? `<div class="list">${li.map(it => {
+      const extras = (it.extras || []).map(x => `<details class="after"><summary>${esc(x.rotulo || "Outra versão")}</summary><div class="msg">${esc(x.texto)}</div><div class="actions">${copyBtn(x.texto)}</div></details>`).join("");
+      const text = it.texto ? `${it.texto_rotulo ? `<div class="msg-label">${esc(it.texto_rotulo)}</div>` : ""}<div class="msg">${esc(it.texto)}</div>`
+        : `<div class="msg">Texto não encontrado em <code>${esc(it.arquivo || "rascunhos/linkedin/")}</code>.</div>`;
+      return task(it.id, it.ordem, `<div class="head"><span class="company">${company(it)}</span><span class="pill kind-${esc(it.tipo)}">${esc(it.tipo_rotulo)}</span></div>
+        <div class="who"><b>${esc(it.nome)}</b>${it.cargo ? ` <span>· ${esc(it.cargo)}</span>` : ""}</div>
+        ${text}${extras}
+        <div class="actions">${it.perfil ? `<a class="btn" href="${esc(it.perfil)}" target="_blank" rel="noopener">Abrir perfil</a>` : ""}${it.texto ? copyBtn(it.texto) : ""}</div>`);
+    }).join("")}</div>` : nothing;
+
+    // d) E-mails
+    const gmail = p.modo_email !== "arquivo";
+    h += `<h2 class="group" id="p-emails">E-mails <span class="count">${em.length}</span><small>${gmail ? "rascunhos prontos no Gmail" : "rascunhos em rascunhos/email/"}</small></h2>`;
+    h += em.length ? `<div class="list">${em.map((it, i) => task(it.id, i + 1, `<div class="head"><span class="company">${company(it)}</span></div>
+        <div class="line"><span class="meta">Para:</span> <b>${esc(it.para)}</b></div>
+        <div class="line"><span class="meta">Assunto:</span> ${esc(it.assunto)}</div>
+        ${!gmail && it.texto ? `<div class="msg">${esc(it.texto)}</div>` : ""}
+        <div class="actions">${gmail ? `<a class="btn primary" href="${esc(p.gmail_rascunhos)}" target="_blank" rel="noopener">Abrir Rascunhos do Gmail</a>` : (it.texto ? copyBtn(it.texto) : "")}</div>`)).join("")}</div>` : nothing;
+
+    // e) Decisões suas
+    h += `<h2 class="group" id="p-decisoes">Decisões suas <span class="count">${dec.length}</span><small>vagas em que o robô não se candidatou</small></h2>`;
+    h += dec.length ? `<div class="list">${dec.map((it, i) => task(it.id, i + 1, `<div class="head"><span class="company">${company(it)}</span></div>
+        <div class="line">${esc(cap(it.motivo))}</div>
+        <div class="meta">Fonte: ${esc(it.origem)}</div>
+        <div class="actions">${it.link ? `<a class="btn primary" href="${esc(it.link)}" target="_blank" rel="noopener">Abrir a vaga</a>` : ""}${it.relatorio && !d.demo ? `<a class="btn" href="../${esc(it.relatorio)}" target="_blank" rel="noopener">Relatório da empresa</a>` : ""}</div>`)).join("")}</div>` : nothing;
+
+    // f) Enviados hoje (only through the local server: each one can be undone)
+    if (MODE === "servidor") {
+      h += `<h2 class="group" id="p-enviados">Enviados hoje <span class="count">${sent.length}</span><small>marcados como Feito hoje</small></h2>`;
+      h += sent.length ? `<div class="list">${sent.map((it, i) => `<article class="task sent" data-id="${esc(it.id)}"><div class="n ok">✓</div><div>
+          <div class="head"><span class="pill kind-mensagem">${esc(KIND[it.tipo] || it.tipo)}</span><span class="company">${it.numero != null ? "#" + esc(it.numero) + " " : ""}${esc(it.empresa || "")}</span></div>
+          <div class="line">${esc(cap(it.descricao))}</div><div class="meta">Registrado em ${esc(br(it.data))}</div></div>
+          <button class="btn" type="button" data-undo="${esc(it.id)}">Desfazer</button></article>`).join("")}</div>`
+        : `<div class="empty">Nada marcado como Feito hoje.</div>`;
+    }
+    h += `</section>`;
+    return h;
+  }
+
+  function bindPending(app) {
+    app.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+      copyText(COPY[+b.getAttribute("data-copy")]).then(() => {
+        const old = b.textContent; b.textContent = "Copiado ✓"; b.classList.add("copied");
+        setTimeout(() => { b.textContent = old; b.classList.remove("copied"); }, 1600);
+      });
+    }));
+    const status = (msg, bad) => {
+      const el = document.getElementById("acao-status"); if (!el) return;
+      el.hidden = !msg; el.textContent = msg || ""; el.classList.toggle("bad", !!bad); el.classList.toggle("on", !bad);
+    };
+    const rerender = (data, msg) => {
+      const y = window.scrollY; render(data); window.scrollTo({ top: y, behavior: "instant" }); status(msg);
+    };
+    app.querySelectorAll("[data-done]").forEach(cb => cb.addEventListener("change", () => {
+      const art = cb.closest(".task");
+      if (MODE === "demo") { art.classList.toggle("done", cb.checked); return; }
+      if (MODE !== "servidor" || !cb.checked) return;
+      cb.disabled = true; art.classList.add("done");
+      api("api/feito", cb.getAttribute("data-done"))
+        .then(out => rerender(out.dados, "Registrado como enviado hoje. Está em \"Enviados hoje\", com o botão Desfazer."))
+        .catch(e => { cb.checked = false; cb.disabled = false; art.classList.remove("done"); status("Não registrei: " + e.message, true); });
+    }));
+    app.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click", () => {
+      b.disabled = true;
+      api("api/desfazer", b.getAttribute("data-undo"))
+        .then(out => rerender(out.dados, (out.avisos && out.avisos.length) ? "Desfeito, com avisos: " + out.avisos.join("; ") : "Desfeito: o item voltou para os pendentes."))
+        .catch(e => { b.disabled = false; status("Não desfiz: " + e.message, true); });
+    }));
+    app.querySelectorAll("[data-jump]").forEach(b => b.addEventListener("click", () => {
+      const el = document.getElementById(b.getAttribute("data-jump")); if (el) el.scrollIntoView({ behavior: "smooth" });
+    }));
+  }
+
   // ---------- render ----------
   function render(d) {
+    MODE = SERVER && location.protocol.startsWith("http") ? "servidor" : (d.demo ? "demo" : "arquivo");
+    COPY.length = 0;
     const p = d.projeto || {}, r = d.rodada;
     const pct = p.total ? Math.round((p.concluidas / p.total) * 100) : 0;
     document.title = (d.demo ? "Demo · " : "") + "Painel da prospecção";
@@ -255,7 +465,7 @@
     document.getElementById("generated").innerHTML = `Atualizado em ${esc(br(d.gerado_em))} ${esc((d.gerado_em || "").slice(11))}` +
       (p.data_corte ? ` · envios conferidos desde ${esc(br(p.data_corte))}` : "") + (d.demo ? `<span class="demo-flag">DADOS FICTÍCIOS</span>` : "");
 
-    let html = "";
+    let html = renderPending(d);
 
     // Esta rodada
     html += `<section id="rodada" class="fade"><h2>Esta rodada ${r ? `<small>${esc(br(r.data))} · ${esc(r.arquivo)}</small>` : ""}</h2>`;
@@ -319,32 +529,38 @@
       b.textContent = card.classList.contains("show-table") ? "Ver gráfico" : "Ver tabela";
     }));
     bindTips(app);
-    spy();
+    bindPending(app);
+    tabs();
     tour();
   }
 
-  // ---------- nav highlight ----------
-  function spy() {
-    const links = [...document.querySelectorAll("nav.tabs a")];
-    const sections = links.map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
-    const set = id => links.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + id));
-    const update = () => {
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) return set(sections[sections.length - 1].id);
-      const line = window.innerHeight * 0.35;
-      let current = sections[0];
-      sections.forEach(sec => { if (sec.getBoundingClientRect().top <= line) current = sec; });
-      set(current.id);
-    };
-    window.addEventListener("scroll", update, { passive: true });
-    update();
+  // ---------- tabs: one section at a time; "Pendentes" opens by default (#pendentes, #rodada, ...) ----------
+  const TABS = ["pendentes", "rodada", "projeto", "responderam", "followups"];
+  function showTab(id, scroll) {
+    if (!TABS.includes(id)) id = TABS[0];
+    TABS.forEach(t => { const s = document.getElementById(t); if (s) s.hidden = t !== id; });
+    document.querySelectorAll("nav.tabs a").forEach(a => {
+      const on = a.getAttribute("href") === "#" + id;
+      a.classList.toggle("on", on);
+      if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    const nav = document.querySelector("nav.tabs");
+    if (scroll && nav && window.scrollY > nav.offsetTop) window.scrollTo({ top: nav.offsetTop, behavior: "instant" });
+  }
+  let tabsBound = false;
+  function tabs() {
+    if (!tabsBound) window.addEventListener("hashchange", () => showTab(location.hash.slice(1), true));
+    tabsBound = true;
+    showTab(location.hash.slice(1), false);
   }
 
-  // ---------- ?tour=1 cycles through the sections (used to record the demo GIF) ----------
+  // ---------- ?tour=1 cycles through the tabs (used to record the demo GIF) ----------
+  let touring = false;
   function tour() {
-    if (!/[?&]tour=1/.test(location.search)) return;
-    const ids = ["rodada", "projeto", "responderam", "followups"];
+    if (touring || !/[?&]tour=1/.test(location.search)) return;
+    touring = true;
     let i = 0;
-    setInterval(() => { i = (i + 1) % ids.length; document.getElementById(ids[i]).scrollIntoView({ behavior: "smooth" }); }, 2600);
+    setInterval(() => { i = (i + 1) % TABS.length; showTab(TABS[i], true); }, 2600);
   }
 
   // ---------- load ----------

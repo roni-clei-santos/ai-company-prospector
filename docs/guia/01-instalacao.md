@@ -27,7 +27,7 @@ O instalador:
 1. confere o Homebrew e o `python3` (instala o Python com o Homebrew, se faltar);
 2. instala `openpyxl`, `reportlab` e `pytest` só para o seu usuário (`pip install --user`);
 3. instala o [RTK](https://github.com/rtk-ai/rtk) com `brew install rtk` (se ainda não tiver) e liga o RTK no Claude Code (`rtk init -g --auto-patch`), conferindo com `rtk init --show` e `rtk gain`;
-4. cria os links das skills `/build-company-list` e `/next-companies` em `~/.claude/skills/` (`scripts/atualizar_skills.py`; se já existir uma pasta com o mesmo nome, ela é guardada em `~/.claude/skills.backup/<nome>.backup-AAAAMMDD`);
+4. cria os links das skills `/build-company-list`, `/next-companies` e `/painel` em `~/.claude/skills/` (`scripts/atualizar_skills.py`; se já existir uma pasta com o mesmo nome, ela é guardada em `~/.claude/skills.backup/<nome>.backup-AAAAMMDD`);
 5. copia `perfil.example.md` para `perfil.local.md`, se ainda não existir.
 
 ![Saída do ./install.sh com dados fictícios](img/terminal-install.png)

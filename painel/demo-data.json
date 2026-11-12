@@ -1,6 +1,232 @@
 {
   "gerado_em": "2026-11-11 18:30",
   "demo": true,
+  "pendentes": {
+    "hoje": "2026-11-11",
+    "totais": {
+      "linkedin": 8,
+      "email": 3,
+      "followups_vencidos": 1,
+      "decisoes": 2,
+      "respostas": 1
+    },
+    "conferencia": {
+      "linkedin_secao4": 8,
+      "linkedin_painel": 8,
+      "ocultos_nao_contatar": 0,
+      "fonte": "relatorio-parcial.md"
+    },
+    "modo_email": "gmail_rascunho",
+    "gmail_rascunhos": "https://mail.google.com/mail/u/0/#drafts",
+    "linkedin": [
+      {
+        "id": "li:example.com/in/recrutadora-exemplo",
+        "numero": 21,
+        "empresa": "Loja Exemplo 1",
+        "nome": "Recrutadora Exemplo",
+        "cargo": "Tech Recruiter, Loja Exemplo 1",
+        "perfil": "https://example.com/in/recrutadora-exemplo",
+        "tipo": "convite",
+        "tipo_rotulo": "Convite com nota",
+        "texto": "Oi, Recrutadora, tudo certinho? Vi que você cuida das vagas de tecnologia da Loja Exemplo 1. Sou dev full-stack sênior, 10+ anos em e-commerce. Se abrir algo, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [
+          {
+            "rotulo": "Mensagem para depois que aceitar",
+            "texto": "Oi, Recrutadora, obrigado por aceitar! Vi a vaga de Dev E-commerce Sênior e queria me apresentar. Sou dev full-stack sênior, 10+ anos em e-commerce. Já liderei migrações e integrações com ERP. Se fizer sentido para o time, conta comigo."
+          }
+        ],
+        "arquivo": "rascunhos/linkedin/021-exemplo.md",
+        "grupo": 1,
+        "ordem": 1
+      },
+      {
+        "id": "li:example.com/in/gerente-exemplo",
+        "numero": 21,
+        "empresa": "Loja Exemplo 1",
+        "nome": "Gerente Exemplo",
+        "cargo": "Gerente de E-commerce, Loja Exemplo 1",
+        "perfil": "https://example.com/in/gerente-exemplo",
+        "tipo": "convite",
+        "tipo_rotulo": "Convite com nota",
+        "texto": "Oi, Gerente, tudo certinho? Vi que você lidera o e-commerce da Loja Exemplo 1. Sou dev full-stack sênior, 10+ anos em e-commerce. Se precisar de reforço, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [
+          {
+            "rotulo": "Mensagem para depois que aceitar",
+            "texto": "Oi, Gerente, obrigado por aceitar! Sou dev full-stack sênior, 10+ anos em e-commerce. Se abrir vaga no time ou surgir um projeto onde eu possa somar, conta comigo."
+          }
+        ],
+        "arquivo": "rascunhos/linkedin/021-exemplo.md",
+        "grupo": 1,
+        "ordem": 2
+      },
+      {
+        "id": "li:example.com/in/tech-lead-exemplo",
+        "numero": 23,
+        "empresa": "Agência Exemplo 3",
+        "nome": "Tech Lead Exemplo",
+        "cargo": "Tech Lead, Agência Exemplo 3",
+        "perfil": "https://example.com/in/tech-lead-exemplo",
+        "tipo": "mensagem",
+        "tipo_rotulo": "Mensagem direta",
+        "texto": "Oi, Tech Lead, tudo certinho? A gente já se cruzou em um evento de e-commerce. Sou dev full-stack sênior, 10+ anos em e-commerce. Quando o time tiver pico de demanda ou abrir uma vaga onde eu possa somar, CLT ou PJ, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [],
+        "arquivo": "rascunhos/linkedin/023-exemplo.md",
+        "grupo": 1,
+        "ordem": 3
+      },
+      {
+        "id": "li:example.com/in/coordenadora-exemplo",
+        "numero": 23,
+        "empresa": "Agência Exemplo 3",
+        "nome": "Coordenadora Exemplo",
+        "cargo": "People Partner, Agência Exemplo 3",
+        "perfil": "https://example.com/in/coordenadora-exemplo",
+        "tipo": "mensagem",
+        "tipo_rotulo": "Mensagem direta (na conversa que já existe)",
+        "texto": "Oi, Coordenadora, tudo certinho? Faz um tempo que a gente não se fala! Vi que você segue no time de pessoas da Agência Exemplo 3. Sou dev full-stack sênior, 10+ anos em e-commerce. Se abrir uma vaga, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [],
+        "arquivo": "rascunhos/linkedin/023-exemplo.md",
+        "grupo": 1,
+        "ordem": 4
+      },
+      {
+        "id": "li:example.com/in/diretora-exemplo",
+        "numero": 25,
+        "empresa": "Consultoria Exemplo 5",
+        "nome": "Diretora Exemplo",
+        "cargo": "Diretora de Tecnologia, Consultoria Exemplo 5",
+        "perfil": "https://example.com/in/diretora-exemplo",
+        "tipo": "convite",
+        "tipo_rotulo": "Convite com nota",
+        "texto": "Oi, Diretora, tudo certinho? Vi que você lidera tecnologia na Consultoria Exemplo 5. Sou dev full-stack sênior, 10+ anos em e-commerce. Se fizer sentido, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [
+          {
+            "rotulo": "Mensagem para depois que aceitar",
+            "texto": "Oi, Diretora, obrigado por aceitar! Sou dev full-stack sênior, 10+ anos em e-commerce. Também atuei como líder técnico e arquiteto de soluções. Se surgir algo onde eu possa somar, conta comigo."
+          }
+        ],
+        "arquivo": "rascunhos/linkedin/025-exemplo.md",
+        "grupo": 1,
+        "ordem": 5
+      },
+      {
+        "id": "li:example.com/in/analista-exemplo",
+        "numero": 27,
+        "empresa": "Agência Exemplo 7",
+        "nome": "Analista Exemplo",
+        "cargo": "Talent Acquisition, Agência Exemplo 7",
+        "perfil": "https://example.com/in/analista-exemplo",
+        "tipo": "convite",
+        "tipo_rotulo": "Convite com nota",
+        "texto": "Oi, Analista, tudo certinho? Vi que você cuida de Talent Acquisition na Agência Exemplo 7. Sou dev full-stack sênior, 10+ anos em e-commerce. Se abrir algo, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [
+          {
+            "rotulo": "Mensagem para depois que aceitar",
+            "texto": "Oi, Analista, obrigado por aceitar! Sou dev full-stack sênior, 10+ anos em e-commerce. Se surgir uma vaga de desenvolvimento onde eu possa somar, conta comigo."
+          }
+        ],
+        "arquivo": "rascunhos/linkedin/027-exemplo.md",
+        "grupo": 2,
+        "ordem": 6
+      },
+      {
+        "id": "li:example.com/in/socio-exemplo",
+        "numero": 29,
+        "empresa": "Agência Exemplo 9",
+        "nome": "Sócio Exemplo",
+        "cargo": "Sócio-fundador, Agência Exemplo 9",
+        "perfil": "https://example.com/in/socio-exemplo",
+        "tipo": "mensagem",
+        "tipo_rotulo": "Mensagem direta",
+        "texto": "Oi, Sócio, tudo certinho? Vi que a Agência Exemplo 9 cresceu bastante em e-commerce. Sou dev full-stack sênior, 10+ anos em e-commerce. Quando aparecer pico de demanda ou um projeto a mais do que cabe na agenda, consigo apoiar, inclusive em white-label. Se fizer sentido, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [],
+        "arquivo": "rascunhos/linkedin/029-exemplo.md",
+        "grupo": 2,
+        "ordem": 7
+      },
+      {
+        "id": "li:example.com/in/head-exemplo",
+        "numero": 30,
+        "empresa": "Loja Exemplo 10",
+        "nome": "Head Exemplo",
+        "cargo": "Head de Produto Digital, Loja Exemplo 10",
+        "perfil": "https://example.com/in/head-exemplo",
+        "tipo": "convite",
+        "tipo_rotulo": "Convite com nota",
+        "texto": "Oi, Head, tudo certinho? Vi que você lidera o produto digital da Loja Exemplo 10. Sou dev full-stack sênior, 10+ anos em e-commerce. Se precisar de reforço, conta comigo.",
+        "texto_rotulo": null,
+        "extras": [
+          {
+            "rotulo": "Mensagem para depois que aceitar",
+            "texto": "Oi, Head, obrigado por aceitar! Sou dev full-stack sênior, 10+ anos em e-commerce. Se abrir vaga no time, conta comigo."
+          }
+        ],
+        "arquivo": "rascunhos/linkedin/030-exemplo.md",
+        "grupo": 2,
+        "ordem": 8
+      }
+    ],
+    "emails": [
+      {
+        "id": "em:22:rh@loja2.example.com",
+        "numero": 22,
+        "empresa": "Loja Exemplo 2",
+        "para": "rh@loja2.example.com",
+        "assunto": "Dev E-commerce Sênior | Alex Exemplo",
+        "arquivo": "rascunhos/email/022-loja-exemplo-2.md"
+      },
+      {
+        "id": "em:23:contato@agencia3.example.com",
+        "numero": 23,
+        "empresa": "Agência Exemplo 3",
+        "para": "contato@agencia3.example.com",
+        "assunto": "Parceria em e-commerce | Alex Exemplo",
+        "arquivo": "rascunhos/email/023-agencia-exemplo-3.md"
+      },
+      {
+        "id": "em:29:socio@agencia9.example.com",
+        "numero": 29,
+        "empresa": "Agência Exemplo 9",
+        "para": "socio@agencia9.example.com",
+        "assunto": "Apoio em picos de demanda | Alex Exemplo",
+        "arquivo": "rascunhos/email/029-agencia-exemplo-9.md"
+      }
+    ],
+    "decisoes": [
+      {
+        "numero": 25,
+        "empresa": "Consultoria Exemplo 5",
+        "motivo": "Vaga de gestão (Gerente de E-commerce, aderência 82%): pela regra, o robô nunca se candidata sozinho. A decisão é sua.",
+        "origem": "rodada de 11/11",
+        "id": "de:25",
+        "link": "https://example.com/vagas/gerente-ecommerce",
+        "relatorio": null
+      },
+      {
+        "numero": 28,
+        "empresa": "Loja Exemplo 8",
+        "motivo": "A vaga Dev Full-Stack Sênior pede inglês fluente e o seu perfil diz intermediário. Não me candidatei; a decisão é sua.",
+        "origem": "rodada de 07/11",
+        "id": "de:28",
+        "link": "https://example.com/vagas/dev-full-stack",
+        "relatorio": null
+      }
+    ],
+    "respostas": [
+      {
+        "id": "re:recrutadora exemplo (#22 loja exemplo 2) pediu o curriculo atualizado",
+        "texto": "Recrutadora Exemplo (#22 Loja Exemplo 2) pediu o currículo atualizado",
+        "rodada": "2026-11-11"
+      }
+    ]
+  },
   "projeto": {
     "total": 80,
     "concluidas": 30,
@@ -102,7 +328,7 @@
         "subitens": []
       },
       {
-        "texto": "Enviar os 3 e-mails que estão em rascunhos/email/.",
+        "texto": "Enviar os 3 e-mails que estão em Gmail > Rascunhos.",
         "subitens": []
       },
       {
@@ -236,15 +462,27 @@
   "followups": [
     {
       "quem": "Recrutadora Exemplo (Loja Exemplo 1, #21)",
-      "data": "2026-11-10"
+      "data": "2026-11-10",
+      "rodada": "2026-11-07",
+      "numeros": [
+        21
+      ]
     },
     {
       "quem": "Tech Lead Exemplo (Agência Exemplo 7, #27)",
-      "data": "2026-11-18"
+      "data": "2026-11-18",
+      "rodada": "2026-11-11",
+      "numeros": [
+        27
+      ]
     },
     {
       "quem": "Diretora Exemplo (Consultoria Exemplo 5, #25)",
-      "data": "2026-11-25"
+      "data": "2026-11-25",
+      "rodada": "2026-11-11",
+      "numeros": [
+        25
+      ]
     }
   ]
 }

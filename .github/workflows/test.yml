@@ -37,12 +37,14 @@ jobs:
           ./install.sh                                   # idempotent: second run must also pass
           test -L "$HOME/.claude/skills/next-companies"
           test -L "$HOME/.claude/skills/build-company-list"
+          test -L "$HOME/.claude/skills/painel"
           test -f perfil.local.md
           python -m pytest -q -rs
           python .github/ci/projeto_demo.py "$RUNNER_TEMP/proj"
           cd "$RUNNER_TEMP/proj"
           python "$GITHUB_WORKSPACE/scripts/gerar_painel.py" --no-open
           test -s painel/data.json
+          python "$GITHUB_WORKSPACE/.github/ci/projeto_demo.py" . --check
 
       # Windows: install.ps1 in a temporary USERPROFILE (PowerShell 5.1, then 7), tests and the panel
       - name: install.ps1 + pytest + panel (Windows)
@@ -57,7 +59,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "install.ps1 (PowerShell 5.1) exit $LASTEXITCODE" }
           pwsh -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
           if ($LASTEXITCODE -ne 0) { throw "install.ps1 (PowerShell 7) exit $LASTEXITCODE" }
-          foreach ($s in 'next-companies', 'build-company-list') {
+          foreach ($s in 'next-companies', 'build-company-list', 'painel') {
             if (-not (Test-Path "$env:USERPROFILE\.claude\skills\$s\SKILL.md")) { throw "skill $s not copied" }
             if (-not (Test-Path "$env:USERPROFILE\.claude\skills\$s\.installed-from")) { throw "skill $s without .installed-from" }
           }
@@ -71,4 +73,6 @@ jobs:
           python (Join-Path $env:GITHUB_WORKSPACE 'scripts\gerar_painel.py') --no-open
           if ($LASTEXITCODE -ne 0) { throw "gerar_painel exit $LASTEXITCODE" }
           if (-not (Test-Path .\painel\data.json)) { throw "painel/data.json not created" }
+          python (Join-Path $env:GITHUB_WORKSPACE '.github\ci\projeto_demo.py') . --check
+          if ($LASTEXITCODE -ne 0) { throw "pendentes check exit $LASTEXITCODE" }
           Pop-Location

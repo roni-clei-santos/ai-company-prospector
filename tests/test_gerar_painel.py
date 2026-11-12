@@ -148,6 +148,7 @@ def test_followup_label_formats():
 def test_opens_browser_unless_no_open(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda uri: calls.append(uri) or True)
+    monkeypatch.setattr(gerar_painel, "ensure_server", lambda root: None)  # no server: falls back to the file
     make_project(tmp_path, monkeypatch, WITH_FOLLOWUPS)  # uses --no-open
     assert calls == []
     gerar_painel.main([])

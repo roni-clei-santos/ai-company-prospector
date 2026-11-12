@@ -17,16 +17,19 @@ draft) unless --forcar is given. --nao-contatar adds a PERSON to progresso.json 
 """
 import argparse
 import json
+import re
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from urllib.parse import unquote
 
 import openpyxl
 from openpyxl.styles import Alignment, Font
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (DO_NOT_CONTACT, OFFICIAL_STATUSES, backup_file, find_company_sheet,  # noqa: E402
-                    mentions_person, normalize_url, project_root, read_profile_fields, save_workbook_atomic, split_status, write_json_atomic)
+                    mentions_person, normalize_url, normalize_url_text, project_root, read_profile_fields,
+                    save_workbook_atomic, split_status, write_json_atomic)
 
 # (json key, column header, accepted legacy header prefixes)
 COLUMNS = [
@@ -179,6 +182,291 @@ def add_do_not_contact(name, company=None, email=None, linkedin=None, reason=Non
     backup_file(progress_path)
     write_json_atomic(progress_path, prog)
     print(f"{DO_NOT_CONTACT}: {name or email or linkedin} registrado")
+
+
+# ---------------------------------------------------------------------------------------------
+# "Feito" in the panel: the candidate's click is the source of truth.
+# mark_done() records an item of the "Pendentes" tab as ENVIADO (sent) today in every place the
+# robot records a send: progresso.json > historico, relatorio-parcial.md (sections 3/4), the
+# company report (relatorios/NNN-*.md), the draft file, controle/historico-contatos.md and the
+# relatorio-final.xlsx row. Every write is a reversible operation stored in
+# controle/painel-feitos.json, so undo_done() reverts exactly what was written.
+# ---------------------------------------------------------------------------------------------
+DONE_LOG = Path("controle") / "painel-feitos.json"
+
+
+def load_done(root):
+    path = Path(root) / DONE_LOG
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {"feitos": []}
+
+
+def done_ids(root):
+    return {f["id"] for f in load_done(root).get("feitos", [])}
+
+
+def _read(path):
+    return path.read_text(encoding="utf-8") if path.exists() else None
+
+
+def _write(path, text):
+    path.write_text(text, encoding="utf-8", newline="")
+
+
+def _lines(text):
+    return text.split("\n")
+
+
+def _replace_line(root, rel, old, new, ops):
+    path = Path(root) / rel
+    text = _read(path)
+    if text is None or old not in _lines(text):
+        return False
+    lines = _lines(text)
+    lines[lines.index(old)] = new
+    _write(path, "\n".join(lines))
+    ops.append({"op": "trocar_linha", "arquivo": rel, "antes": old, "depois": new})
+    return True
+
+
+def _insert_line(root, rel, index, line, ops):
+    """Insert `line` before line number `index` (None = at the end of the file)."""
+    path = Path(root) / rel
+    text = _read(path)
+    if text is None:
+        return False
+    lines = _lines(text)
+    if index is None:
+        while lines and lines[-1] == "":
+            lines.pop()
+        lines += [line, ""]
+    else:
+        lines.insert(index, line)
+    _write(path, "\n".join(lines))
+    ops.append({"op": "inserir_linha", "arquivo": rel, "linha": line})
+    return True
+
+
+def _company_report(root, num):
+    folder = Path(root) / "relatorios"
+    if num is None or not folder.exists():
+        return None
+    found = sorted(folder.glob(f"{int(num):03d}-*.md")) or sorted(folder.glob(f"{int(num)}-*.md"))
+    return found[0].relative_to(root).as_posix() if found else None
+
+
+def _contacts_insert_index(text, num):
+    """Line index right after the '### #N ...' block of historico-contatos.md (None = end of file)."""
+    lines = _lines(text)
+    start = next((i for i, l in enumerate(lines) if re.match(rf"^###\s+#{int(num)}\b", l)), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("#")), len(lines))
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    return end
+
+
+def _xlsx_append(root, num, column, suffix, ops):
+    path = Path(root) / "relatorio-final.xlsx"
+    if num is None or not path.exists():
+        return False
+    wb = openpyxl.load_workbook(path)
+    ws = wb["Empresas"]
+    header = [c.value for c in ws[1]]
+    if column not in header:
+        return False
+    col = header.index(column) + 1
+    row = next((r for r in ws.iter_rows(min_row=2) if r[0].value is not None and str(r[0].value).split(".")[0] == str(int(num))), None)
+    if row is None:
+        return False
+    cell = ws.cell(row=row[0].row, column=col)
+    cell.value = f"{cell.value or ''}{suffix}"
+    save_workbook_atomic(wb, path)
+    ops.append({"op": "xlsx_sufixo", "numero": int(num), "coluna": column, "sufixo": suffix})
+    return True
+
+
+def _history(root, note, ops):
+    path = Path(root) / "controle" / "progresso.json"
+    if not path.exists():
+        return False
+    prog = json.loads(path.read_text(encoding="utf-8"))
+    entry = {"em": date.today().isoformat(), "nota": note}
+    prog.setdefault("historico", []).append(entry)
+    backup_file(path)
+    write_json_atomic(path, prog)
+    ops.append({"op": "historico", "em": entry["em"], "nota": note})
+    return True
+
+
+def _section_row(text, section_no, predicate):
+    """First table line of '## <section_no>.' in relatorio-parcial.md for which predicate(line) is true."""
+    inside = False
+    for line in _lines(text):
+        if line.startswith("## "):
+            inside = line.startswith(f"## {section_no}.")
+            continue
+        if inside and line.strip().startswith("|") and predicate(line):
+            return line
+    return None
+
+
+def _mark_row(line, first_cell=None, prefix_cell=None):
+    """Rewrite a markdown table row: replace cell 0 and/or prefix another cell."""
+    cells = re.split(r"(?<!\\)\|", line.strip().strip("|"))
+    if first_cell is not None:
+        cells[0] = f" {first_cell} "
+    if prefix_cell is not None:
+        idx, prefix = prefix_cell
+        cells[idx] = f" {prefix} {cells[idx].strip()} "
+    return "|" + "|".join(cells) + "|"
+
+
+def _heading_of(text, url, name):
+    """The '## N) ...' heading line of the person in a LinkedIn draft (by profile URL, then by name)."""
+    lines = _lines(text)
+    heads = [i for i, l in enumerate(lines) if re.match(r"^#{2,3}\s+\d+\)", l)]
+    key = normalize_url(url)
+    for n, i in enumerate(heads):
+        end = heads[n + 1] if n + 1 < len(heads) else len(lines)
+        for l in lines[i:end]:
+            m = re.match(r"^-\s*(?:Perfil|P[áa]gina)\s*:\s*(\S+)", l.strip())
+            if m and key and normalize_url(unquote(m.group(1))) == normalize_url(unquote(key)):
+                return lines[i]
+    for i in heads:
+        if name and name.lower() in lines[i].lower():
+            return lines[i]
+    return None
+
+
+def mark_done(root, kind, item, today=None):
+    """Record one item of the panel as sent (or handled) today. Returns the journal entry."""
+    root = Path(root)
+    today = today or date.today().isoformat()
+    log = load_done(root)
+    if any(f["id"] == item["id"] for f in log["feitos"]):
+        raise ValueError("already marked")
+    br = f"{today[8:10]}/{today[5:7]}/{today[:4]}"
+    ops = []
+    nums = [n for n in (item.get("numeros") or [item.get("numero")]) if n is not None]
+    company = item.get("empresa") or ""
+    if kind == "linkedin":
+        what = f"LinkedIn para {item.get('nome')}"
+    elif kind == "email":
+        what = f"e-mail para {item.get('para')} ({item.get('assunto')})"
+    elif kind == "followup":
+        what = f"follow-up para {item.get('quem')}"
+    elif kind == "resposta":
+        what = f"resposta tratada: {item.get('texto')}"
+    elif kind == "decisao":
+        what = f"decisão tomada: {item.get('motivo')}"
+    else:
+        raise ValueError(f"unknown kind {kind!r}")
+    sent = "ENVIADO" if kind in ("linkedin", "email", "followup") else "FEITO"
+    label = f"{sent} {br} (marcado no painel): {what}"
+
+    parcial = root / "relatorio-parcial.md"
+    text = _read(parcial)
+    if text is not None and kind == "linkedin" and item.get("perfil"):
+        key = normalize_url(unquote(item["perfil"]))
+        pattern = re.compile(re.escape(key) + r"(?![\w%-])")
+        row = _section_row(text, 4, lambda l: "✅" not in l and pattern.search(normalize_url_text(unquote(l).lower())))
+        if row:
+            _replace_line(root, "relatorio-parcial.md", row, _mark_row(row, "✅", (2, f"**ENVIADO {br}**")), ops)
+    if text is not None and kind == "email" and item.get("para"):
+        row = _section_row(text, 3, lambda l: "✅" not in l and item["para"].lower() in l.lower())
+        if row:
+            num = item.get("numero")
+            _replace_line(root, "relatorio-parcial.md", row, _mark_row(row, f"{num} ✅ ENVIADO {br[:5]}"), ops)
+
+    draft = item.get("arquivo")
+    if draft and (root / draft).exists():
+        dtext = _read(root / draft)
+        if kind == "linkedin":
+            head = _heading_of(dtext, item.get("perfil"), item.get("nome"))
+            if head:
+                new = re.sub(r"^(#{2,3}\s+\d+\)\s*)", rf"\1[ENVIADO {br}] ", head)
+                _replace_line(root, draft, head, new, ops)
+        elif kind == "email":
+            _insert_line(root, draft, 0, f"> ✅ ENVIADO pelo candidato em {br} (marcado no painel). Não criar rascunho novo para este endereço.", ops)
+
+    for num in nums:
+        report = _company_report(root, num)
+        if report:
+            _insert_line(root, report, None, f"- {label}.", ops)
+        contacts = root / "controle" / "historico-contatos.md"
+        ctext = _read(contacts)
+        if ctext is not None:
+            _insert_line(root, "controle/historico-contatos.md", _contacts_insert_index(ctext, num),
+                         f"- (painel) {br}: {sent} pelo candidato, {what} (#{num} {company}).".replace("  ", " "), ops)
+        column = "Rascunhos criados" if kind in ("linkedin", "email") else "Pendências do candidato"
+        _xlsx_append(root, num, column, f" | {label}.", ops)
+    _history(root, f"Painel: {label} (#{', #'.join(str(n) for n in nums)}).", ops)
+
+    entry = {"id": item["id"], "tipo": kind, "data": today, "descricao": what, "empresa": company,
+             "numero": nums[0] if nums else None, "operacoes": ops}
+    log["feitos"].append(entry)
+    path = root / DONE_LOG
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(path, log)
+    return entry
+
+
+def undo_done(root, item_id):
+    """Revert every write of mark_done() for this item. Returns a list of warnings (empty = all reverted)."""
+    root = Path(root)
+    log = load_done(root)
+    entry = next((f for f in log["feitos"] if f["id"] == item_id), None)
+    if entry is None:
+        raise KeyError(item_id)
+    warnings = []
+    for op in reversed(entry["operacoes"]):
+        if op["op"] == "trocar_linha":
+            ok = _replace_line(root, op["arquivo"], op["depois"], op["antes"], [])
+        elif op["op"] == "inserir_linha":
+            path = root / op["arquivo"]
+            text = _read(path)
+            ok = text is not None and op["linha"] in _lines(text)
+            if ok:
+                lines = _lines(text)
+                del lines[len(lines) - 1 - lines[::-1].index(op["linha"])]
+                _write(path, "\n".join(lines))
+        elif op["op"] == "xlsx_sufixo":
+            path = root / "relatorio-final.xlsx"
+            ok = False
+            if path.exists():
+                wb = openpyxl.load_workbook(path)
+                ws = wb["Empresas"]
+                header = [c.value for c in ws[1]]
+                row = next((r for r in ws.iter_rows(min_row=2) if r[0].value is not None
+                            and str(r[0].value).split(".")[0] == str(op["numero"])), None)
+                if row is not None and op["coluna"] in header:
+                    cell = ws.cell(row=row[0].row, column=header.index(op["coluna"]) + 1)
+                    if str(cell.value or "").endswith(op["sufixo"]):
+                        rest = str(cell.value)[: -len(op["sufixo"])]
+                        cell.value = rest or None
+                        save_workbook_atomic(wb, path)
+                        ok = True
+        elif op["op"] == "historico":
+            path = root / "controle" / "progresso.json"
+            prog = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            hist = prog.get("historico", [])
+            idx = next((i for i in range(len(hist) - 1, -1, -1)
+                        if hist[i].get("nota") == op["nota"] and hist[i].get("em") == op["em"]), None)
+            ok = idx is not None
+            if ok:
+                del hist[idx]
+                backup_file(path)
+                write_json_atomic(path, prog)
+        else:
+            ok = False
+        if not ok:
+            warnings.append(f"{op['op']} {op.get('arquivo') or op.get('coluna') or ''}: não encontrei o que desfazer")
+    log["feitos"] = [f for f in log["feitos"] if f["id"] != item_id]
+    write_json_atomic(root / DONE_LOG, log)
+    return warnings
 
 
 def main(argv=None):

@@ -27,7 +27,7 @@ def env(tmp_path, monkeypatch):
 
 def test_skips_shared_and_lists_skills():
     names = [p.name for p in au.project_skills(REPO)]
-    assert "next-companies" in names and "build-company-list" in names
+    assert "next-companies" in names and "build-company-list" in names and "painel" in names
     assert not any(n.startswith("_") for n in names)
 
 

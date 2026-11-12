@@ -27,7 +27,7 @@
   <a href="https://code.claude.com/docs/en/overview"><img alt="Built for Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
 </p>
 
-https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
+<p align="center"><a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><img src="assets/demo.gif" alt="Demo dashboard: Pendentes (to-do), this round, whole project, replies and follow-ups (fictitious data)" width="100%"></a></p>
 
 <p align="center"><sub>Demo dashboard with 100% fictitious data (in Portuguese). <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Open the live demo</a>.</sub></p>
 
@@ -61,7 +61,7 @@ https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icons/rascunhos.svg" width="40" alt=""><br><b>Drafts you review</b><br>LinkedIn messages and emails in your tone of voice, saved as drafts for you to read and send.</td>
-    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Automatic dashboard</b><br>Each round ends with a dashboard: the round, the whole project, who replied and dated follow-ups.</td>
+    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>A dashboard with everything left to do</b><br>The <b>Pendentes</b> (to-do) tab gathers, from every round, the LinkedIn messages (ready text and a copy button), the emails, the overdue follow-ups and your decisions. <code>/painel</code> refreshes the list without spending a round.</td>
     <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Token savings with RTK</b><br>The installer sets up <a href="https://github.com/rtk-ai/rtk">RTK</a>, which trims command output before it reaches Claude.</td>
   </tr>
   <tr>
@@ -150,7 +150,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 `install.ps1` checks Python (`py -3` or `python`), installs RTK with `winget` and **copies** the skills to `%USERPROFILE%\.claude\skills`. After every `git pull`, run `py -3 scripts\atualizar_skills.py` to copy the new version.
 </details>
 
-Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the folder (`claude`) and run **`/build-company-list`** to get the spreadsheet (no LinkedIn needed). For "Spreadsheet + robot": run `/chrome`, log in to LinkedIn in that Chrome and run **`/next-companies`** every round.
+Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the folder (`claude`) and run **`/build-company-list`** to get the spreadsheet (no LinkedIn needed). For "Spreadsheet + robot": run `/chrome`, log in to LinkedIn in that Chrome and run **`/next-companies`** every round. Between rounds, **`/painel`** checks what you already sent and refreshes the dashboard's Pendentes tab, without processing any company ([dashboard guide, in Portuguese](docs/guia/06-painel.md)).
 
 ## Requirements
 

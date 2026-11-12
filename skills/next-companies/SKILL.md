@@ -28,6 +28,8 @@ Tudo sobre o CANDIDATO está em `perfil.local.md` (o PERFIL). Nunca escreva dado
 
 Monte duas listas de pendentes a partir do `relatorio-parcial.md` (se ele ainda não existir, não há pendentes: pule para o Passo 3): (a) e-mails da seção 3 sem ✅; (b) pessoas da seção 4 sem ✅ e sem "NÃO ENVIAR".
 
+**O clique do CANDIDATO no painel é a fonte da verdade.** Quando ele marca "Feito" na aba Pendentes, o painel já registra o item como ENVIADO em todos os lugares (com ✅ no `relatorio-parcial.md` e uma entrada em `controle/painel-feitos.json`). A conferência abaixo serve só para (1) itens que ele NÃO marcou como Feito, para pegar envios que esqueceu de marcar, e (2) respostas recebidas. Nunca desmarque, "corrija" ou registre de novo um item que está em `controle/painel-feitos.json` ou já tem ✅, mesmo que ele não apareça no LinkedIn ou no Gmail.
+
 ### 2.1 E-mail
 - `modo_email` = "gmail_rascunho": para cada e-mail pendente, procure no Gmail, em Enviados, uma mensagem para o mesmo destinatário com o mesmo assunto, enviada depois da data de criação do rascunho. Se encontrar, ela conta como ENVIADA na data do envio. Só leitura: não abra rascunhos para editar nem envie nada.
 - `modo_email` = "arquivo": o envio não pode ser conferido. Conte como ENVIADO só o arquivo de `rascunhos/email/` em que o próprio CANDIDATO escreveu `ENVIADO DD/MM/AAAA`.
@@ -90,11 +92,11 @@ Para cada uma, nesta ordem:
 3. Acrescente uma nota em `progresso.json > historico` com a data, as empresas e o ponto de retomada: `python3 scripts/registrar.py --historico "<nota>" --sessao <n>`.
 4. Atualize a DATA DE CORTE: a data de criação do rascunho pendente (ainda não enviado, sem NÃO ENVIAR) mais antigo do projeto inteiro, conferida nas seções 3 e 4 do `relatorio-parcial.md` e na data de registro da empresa dona do rascunho. Se não houver nenhum pendente, use a data de hoje. Grave: `python3 scripts/registrar.py --data-corte AAAA-MM-DD`.
 5. Confira que os números do resumo batem com a tabela (soma dos status = empresas processadas).
-6. Gere e abra o painel: `python3 scripts/gerar_painel.py` (o próprio script abre o `painel/index.html` no navegador padrão, em macOS, Linux e Windows).
+6. Gere e abra o painel: `python3 scripts/gerar_painel.py`. Ele inicia (ou reaproveita) o servidor local do painel (`scripts/servidor_painel.py`, só em http://127.0.0.1, numa porta livre, só biblioteca padrão do Python) em segundo plano e abre o painel no navegador padrão (macOS, Linux e Windows). Aberto assim, o botão "Feito" registra o envio. Ao reescrever o `relatorio-parcial.md` (item 1), mantenha os ✅ que o painel gravou.
 7. Responda ao CANDIDATO só com, nesta ordem:
    - Envios que encontrei (e-mail e LinkedIn), "Responderam" e "Conferir", se houver.
    - Tabela das empresas da rodada: número, empresa, status e quantidade de rascunhos.
    - O que o CANDIDATO precisa fazer (envios pendentes desta rodada e follow-ups com data).
    - Pontos para ele conferir.
    - "X de N concluídas. Próxima rodada começa pela #M <empresa>."
-   - "Painel atualizado e aberto: painel/index.html."
+   - "Painel atualizado e aberto: <URL http://127.0.0.1:... que o script mostrou> (aba Pendentes)."

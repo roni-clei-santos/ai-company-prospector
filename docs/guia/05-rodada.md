@@ -12,6 +12,8 @@ Cada `/next-companies` faz **uma rodada** e para:
 
 Para processar menos empresas: `/next-companies limite 3`.
 
+Entre uma rodada e outra, `/painel` faz só o passo 1 (conferir e registrar o que você enviou) e reabre o painel na aba Pendentes, sem processar empresa nenhuma ([o painel](06-painel.md)).
+
 ![Resumo de uma rodada com dados fictícios](img/terminal-rodada.png)
 
 ## Status de cada empresa
