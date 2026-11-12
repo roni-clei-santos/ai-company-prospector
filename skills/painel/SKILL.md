@@ -20,7 +20,7 @@ Se nenhuma existir, PARE com: "Não achei o projeto. Rode o instalador na pasta 
 
 ## Passo 2: abrir o painel
 
-Rode `python3 "<pasta do projeto>/scripts/gerar_painel.py"` (no Windows, `py -3` no lugar de `python3`). O script regenera `painel/data.json` e os relatórios em `painel/relatorios/`. Também liga o servidor local do painel (ou reaproveita o que já está ligado) e abre o painel no navegador padrão, na aba Pendentes. O servidor fica em http://127.0.0.1, só neste computador, e desliga sozinho quando a aba do painel é fechada.
+Rode `python3 "<pasta do projeto>/scripts/gerar_painel.py"` (no Windows, `py -3` no lugar de `python3`). O script regenera `painel/data.json` e os relatórios em `painel/relatorios/`. Também liga o servidor local do painel (ou reaproveita o que já está ligado) e abre o painel no navegador padrão, na aba Pendentes. O servidor fica em http://127.0.0.1, só neste computador, e desliga sozinho alguns minutos depois que a aba do painel é fechada.
 
 Se o script responder "Não achei o projeto. Rode o instalador na pasta do projeto.", repasse a frase e pare.
 

@@ -4,9 +4,9 @@
 
 O painel é o lugar onde você vê tudo o que precisa fazer, de todas as rodadas, sem abrir outro arquivo. Ao fim de cada rodada, o `/next-companies` roda `python3 scripts/gerar_painel.py`, que grava os dados, liga o servidor local e abre o painel no navegador padrão (macOS, Linux e Windows), já na aba **Pendentes**.
 
-**Como abrir o painel:** rode /painel no Claude Code. Ele também abre sozinho no fim de cada rodada. O painel roda só no seu computador e desliga quando você fecha a aba.
+**Como abrir o painel:** rode /painel no Claude Code. Ele também abre sozinho no fim de cada rodada. O painel roda só no seu computador e desliga sozinho alguns minutos depois que você fecha a aba.
 
-Funciona como um app local (no estilo do Jupyter): o `/painel` liga um servidor só no seu computador (`scripts/servidor_painel.py`, só biblioteca padrão do Python, em `http://127.0.0.1` numa porta que o sistema escolhe) e abre o painel no navegador. Nada sai do seu computador. Se o painel já estiver aberto, o `/painel` reaproveita o mesmo servidor; nunca há dois para o mesmo projeto. Ao fechar a aba, o servidor desliga em até 15 segundos (recarregar a página não desliga). Se ninguém usar o painel por 3 minutos, ele também desliga. Nada liga junto com o computador.
+Funciona como um app local (no estilo do Jupyter): o `/painel` liga um servidor só no seu computador (`scripts/servidor_painel.py`, só biblioteca padrão do Python, em `http://127.0.0.1` numa porta que o sistema escolhe) e abre o painel no navegador. Nada sai do seu computador. Se o painel já estiver aberto, o `/painel` reaproveita o mesmo servidor; nunca há dois para o mesmo projeto. Ele desliga sozinho alguns minutos depois que você fecha a aba (recarregar a página não desliga). Nada liga junto com o computador.
 
 Abrir o `painel/index.html` direto do disco mostra só uma tela com a instrução de abrir pelo `/painel`.
 

@@ -9,7 +9,9 @@ Scenarios (each one in a fresh project; where the browser allows it, a fresh pro
   E  no redraw by itself: a sentinel attribute on the content survives 70 s without interaction
   F  server killed with the page open: Feito shows "O painel foi encerrado..." once; 40 s later the
      sentinel is still there and the message appears only once
-  G  closing the tab: within 20 s the server process ended and controle/.painel-servidor.json is gone
+  G  closing the tab: the server process ends and controle/.painel-servidor.json is gone, either by the
+     close beacon (/api/fechou, within 20 s) or by the no-heartbeat rule (45 s in the lab, within 60 s);
+     the result says which one happened
 Safari: its WebDriver does not open file:// pages, so A opens the file with `open -a Safari` and reads it
 with AppleScript ("do JavaScript"); the other scenarios use safaridriver.
 
@@ -100,12 +102,12 @@ def kill(pid):
 
 # ---------------------------------------------------------------- fictitious project + the real /painel
 class Projeto:
-    def __init__(self, tmp_root, nome):
+    def __init__(self, tmp_root, nome, **env):
         self.root = Path(tempfile.mkdtemp(prefix=f"painel-{nome}-", dir=tmp_root))
         projeto_lab.criar(self.root)
         self.url_file = self.root / "controle" / "url-aberta.txt"
         self.env = dict(os.environ, PROSPECT_DIR=str(self.root), LAB_URL_FILE=str(self.url_file),
-                        AI_PROSPECTOR_PROJETO_ARQUIVO=str(self.root / "controle" / ".projeto-lab"))
+                        AI_PROSPECTOR_PROJETO_ARQUIVO=str(self.root / "controle" / ".projeto-lab"), **env)
         self.url = None
 
     def abrir(self):
@@ -709,9 +711,13 @@ def wait_pid_dead(pid):
     return not pid_alive(pid)
 
 
+NO_HEARTBEAT_LAB_S = 45  # PAINEL_SEM_BATIMENTO_S of the server in scenario G (3 minutes in real use)
+
+
 def cenario_g(ctx):
-    """Closing the panel tab turns the server off within 20 s."""
-    proj = Projeto(ctx.tmp, "G")
+    """Closing the panel tab turns the server off: by the close beacon (within 20 s) or, when the browser does
+    not deliver it, by the no-heartbeat rule (45 s here, within 60 s). Both are a pass; the path is recorded."""
+    proj = Projeto(ctx.tmp, "G", PAINEL_SEM_BATIMENTO_S=str(NO_HEARTBEAT_LAB_S))
     try:
         pg = ctx.page_http()
         pg.open(proj.abrir())
@@ -728,12 +734,19 @@ def cenario_g(ctx):
         except WebDriverException as e:
             raise Ambiente(f"o driver não conseguiu fechar só a aba: {first_line(e)}") from e
         t0 = time.time()
-        gone = wait(lambda: wait_pid_dead(proj.pid) and not (proj.root / "controle" / ".painel-servidor.json").exists(), 20, step=0.5)
+        gone = wait(lambda: wait_pid_dead(proj.pid) and not (proj.root / "controle" / ".painel-servidor.json").exists(), 60, step=0.5)
+        secs = round(time.time() - t0, 1)
+        log = proj.root / "controle" / ".painel-servidor.log"
+        text = log.read_text(errors="replace") if log.exists() else ""
         if not gone:
-            log = proj.root / "controle" / ".painel-servidor.log"
-            raise Falha("fechou a aba: o servidor não terminou em 20 s. Log do servidor: "
-                        + (log.read_text(errors="replace")[-600:] if log.exists() else "(sem log)"))
-        return [f"fechou a aba: servidor terminou e apagou o .painel-servidor.json em {round(time.time() - t0, 1)} s"]
+            raise Falha("fechou a aba: o servidor não terminou em 60 s. Log do servidor: " + (text[-600:] or "(sem log)"))
+        if "painel fechado" in text and secs <= 20:
+            caminho = "pelo aviso de aba fechada (/api/fechou)"
+        elif "sem uso" in text:
+            caminho = f"pela falta de batimento ({NO_HEARTBEAT_LAB_S} s no laboratório)"
+        else:
+            caminho = "por motivo não registrado no log"
+        return [f"fechou a aba: servidor terminou {caminho} em {secs} s e apagou o .painel-servidor.json"]
     finally:
         ctx.finish("G")
         proj.stop()

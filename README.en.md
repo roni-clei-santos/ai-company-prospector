@@ -152,7 +152,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the folder (`claude`) and run **`/build-company-list`** to get the spreadsheet (no LinkedIn needed). For "Spreadsheet + robot": run `/chrome`, log in to LinkedIn in that Chrome and run **`/next-companies`** every round. Between rounds, **`/painel`** opens the dashboard on the Pendentes tab, without processing any company and without opening LinkedIn ([dashboard guide, in Portuguese](docs/guia/06-painel.md)).
 
-**How to open the dashboard:** run /painel in Claude Code. It also opens by itself at the end of every round. The dashboard runs only on your computer and turns off when you close the tab.
+**How to open the dashboard:** run /painel in Claude Code. It also opens by itself at the end of every round. The dashboard runs only on your computer and turns off by itself a few minutes after you close the tab.
 
 ## Requirements
 
@@ -237,7 +237,7 @@ It runs on your own Claude Code account, and usage depends on your plan and on h
 <details>
 <summary><b>Does my data go anywhere?</b></summary>
 
-Your profile, spreadsheets, drafts, reports and résumés stay on your computer (they are in `.gitignore`). Nothing leaves your computer: the dashboard runs only on your computer and turns off when you close the tab. What Claude Code reads to do the work goes through Anthropic, as with any Claude Code use, and browsing happens in your own Chrome.
+Your profile, spreadsheets, drafts, reports and résumés stay on your computer (they are in `.gitignore`). Nothing leaves your computer. The dashboard runs only on your computer and turns off by itself a few minutes after you close the tab. What Claude Code reads to do the work goes through Anthropic, as with any Claude Code use, and browsing happens in your own Chrome.
 </details>
 
 <details>
@@ -250,7 +250,7 @@ Installer and automated tests: ✅. `install.ps1` runs on PowerShell 5.1 and 7, 
 
 **What the robot stores.** Name, job title, company, profile link and, when available, the work e-mail of recruiters and HR contacts. Under Brazil's LGPD (and laws like the GDPR), this is personal data, even when it comes from a public profile.
 
-**Where it lives.** Only on the user's computer, in the folders and files that `.gitignore` keeps out of git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, the `.xlsx` spreadsheets, the `relatorio-*.md` files and the files the dashboard generates (`painel/data.json` and `painel/relatorios/`). Nothing leaves your computer: the dashboard runs only on your computer and turns off when you close the tab.
+**Where it lives.** Only on the user's computer, in the folders and files that `.gitignore` keeps out of git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, the `.xlsx` spreadsheets, the `relatorio-*.md` files and the files the dashboard generates (`painel/data.json` and `painel/relatorios/`). Nothing leaves your computer. The dashboard runs only on your computer and turns off by itself a few minutes after you close the tab.
 
 **Who is responsible.** Whoever uses the robot becomes responsible for this data.
 
