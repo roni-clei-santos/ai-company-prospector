@@ -57,7 +57,7 @@ Se o RTK foi instalado e o terminal não o encontra, acrescente `~/.local/bin` a
 </details>
 
 <details>
-<summary><b>Windows (beta)</b></summary>
+<summary><b>Windows</b></summary>
 
 Precisa do Python 3.9 ou mais novo: [python.org](https://www.python.org/downloads/windows/) ou `winget install Python.Python.3.12`. O instalador roda no PowerShell 5.1 e 7 e é testado a cada push no GitHub Actions; as skills ainda não foram usadas num Windows real.
 

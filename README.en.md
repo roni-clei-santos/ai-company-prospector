@@ -22,7 +22,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
   <a href="https://github.com/roni-clei-santos/ai-company-prospector/actions/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/roni-clei-santos/ai-company-prospector/test.yml?branch=main&style=flat-square&label=tests&labelColor=0B1F3A"></a>
-  <a href="#quick-start"><img alt="macOS, Linux and Windows (beta)" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows%20beta-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
+  <a href="#quick-start"><img alt="macOS, Linux and Windows" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
   <a href="https://code.claude.com/docs/en/overview"><img alt="Built for Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
 </p>
 
@@ -116,7 +116,7 @@ cd ai-company-prospector
 </details>
 
 <details>
-<summary><b>Windows (beta)</b></summary>
+<summary><b>Windows</b></summary>
 
 ```powershell
 # 1. Claude Code (if you don't have it yet)
@@ -141,7 +141,7 @@ Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the f
 | "Spreadsheet + robot" only | Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account logged in on that Chrome. A logged-in Gmail is only needed if you choose `modo_email: "gmail_rascunho"`; with `"arquivo"`, emails stay in `rascunhos/email/` |
 | macOS 13+ | [Homebrew](https://brew.sh) (the installer takes care of Python 3 and RTK) |
 | Linux | `sudo` and `apt`, `dnf` or `pacman`, or Python 3.9+ with `pip` already installed |
-| Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.12`) |
+| Windows 10+ | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.12`) |
 
 Full step-by-step guide (Portuguese): [docs/guia](docs/guia/01-instalacao.md). The skills, the agent rules and the guides are in Portuguese for now; an English version is on the [roadmap](ROADMAP.md).
 
@@ -196,7 +196,7 @@ Your profile, spreadsheets, drafts, reports and résumés stay on your computer 
 <details>
 <summary><b>Does it work on Windows?</b></summary>
 
-In beta. `install.ps1` runs on PowerShell 5.1 and 7, copies the skills (Windows needs special permission for symbolic links) and is tested on every push with GitHub Actions (`windows-latest`), together with macOS and Linux. The skills themselves have not been used on a real Windows machine yet; if something breaks, [open an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues).
+Yes. `install.ps1` runs on PowerShell 5.1 and 7, copies the skills (Windows needs special permission for symbolic links) and is tested on every push with GitHub Actions (`windows-latest`): installer, tests and dashboard, together with macOS and Linux. The skills themselves have not been used on a real Windows machine yet; if something breaks, [open an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues).
 </details>
 
 ## Notice

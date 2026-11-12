@@ -22,7 +22,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="Licença MIT" src="https://img.shields.io/badge/licen%C3%A7a-MIT-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
   <a href="https://github.com/roni-clei-santos/ai-company-prospector/actions/workflows/test.yml"><img alt="Testes" src="https://img.shields.io/github/actions/workflow/status/roni-clei-santos/ai-company-prospector/test.yml?branch=main&style=flat-square&label=testes&labelColor=0B1F3A"></a>
-  <a href="#começo-rápido"><img alt="macOS, Linux e Windows (beta)" src="https://img.shields.io/badge/plataformas-macOS%20%7C%20Linux%20%7C%20Windows%20beta-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
+  <a href="#começo-rápido"><img alt="macOS, Linux e Windows" src="https://img.shields.io/badge/plataformas-macOS%20%7C%20Linux%20%7C%20Windows-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
   <a href="https://code.claude.com/docs/en/overview"><img alt="Feito para o Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
 </p>
 
@@ -116,7 +116,7 @@ O `install.sh` instala `python3` e `pip` pelo `apt`, `dnf` ou `pacman` (pode ped
 </details>
 
 <details>
-<summary><b>Windows (beta)</b></summary>
+<summary><b>Windows</b></summary>
 
 ```powershell
 # 1. Claude Code (se ainda não tiver)
@@ -141,7 +141,7 @@ Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na 
 | Só no modo "Planilha + robô" | Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn logada nesse Chrome. O Gmail logado só é preciso se você escolher `modo_email: "gmail_rascunho"`; com `"arquivo"`, os e-mails ficam em `rascunhos/email/` |
 | macOS 13+ | [Homebrew](https://brew.sh) (o instalador cuida do Python 3 e do RTK) |
 | Linux | `sudo` e `apt`, `dnf` ou `pacman`, ou Python 3.9+ com `pip` já instalados |
-| Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) ou `winget install Python.Python.3.12`) |
+| Windows 10+ | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) ou `winget install Python.Python.3.12`) |
 
 Passo a passo completo: [docs/guia](docs/guia/01-instalacao.md).
 
@@ -196,7 +196,7 @@ Seu perfil, planilhas, rascunhos, relatórios e currículos ficam só no seu com
 <details>
 <summary><b>Funciona no Windows?</b></summary>
 
-Em beta. O `install.ps1` roda no PowerShell 5.1 e 7, copia as skills (o Windows exige permissão especial para links simbólicos) e é testado a cada push no GitHub Actions (`windows-latest`), junto com macOS e Linux. As skills em si não foram usadas num Windows real ainda; se algo falhar, [abra uma issue](https://github.com/roni-clei-santos/ai-company-prospector/issues).
+Sim. O `install.ps1` roda no PowerShell 5.1 e 7, copia as skills (o Windows exige permissão especial para links simbólicos) e é testado a cada push no GitHub Actions (`windows-latest`): instalador, testes e painel, junto com macOS e Linux. As skills em si ainda não foram usadas num Windows real; se algo falhar, [abra uma issue](https://github.com/roni-clei-santos/ai-company-prospector/issues).
 </details>
 
 ## Aviso
