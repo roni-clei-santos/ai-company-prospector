@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import openpyxl
@@ -76,9 +77,14 @@ def make_project(tmp_path, monkeypatch, round_text):
 
 
 def render(tmp_path):
-    out = subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--virtual-time-budget=3000", "--dump-dom",
-                          (tmp_path / "painel" / "index.html").as_uri()],
-                         capture_output=True, text=True, timeout=60).stdout
+    profile = tempfile.mkdtemp(prefix="chrome-test-")  # own profile: never touches the user's Chrome
+    try:
+        out = subprocess.run([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}",
+                              "--no-first-run", "--no-default-browser-check", "--virtual-time-budget=3000",
+                              "--dump-dom", (tmp_path / "painel" / "index.html").as_uri()],
+                             capture_output=True, text=True, timeout=30).stdout
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
     m = re.search(r'<ol class="todo">(.*?)</ol>', out, re.S)
     assert m, "to-do list not rendered"
     return m.group(1)
