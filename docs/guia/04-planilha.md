@@ -11,6 +11,8 @@
 | O que você recebe | Empresas reais que usam a sua tecnologia, cada uma com evidência e link da fonte | O fluxo completo: rodadas de 10 empresas, vagas avaliadas, rascunhos de LinkedIn e e-mail e o painel |
 | Quem faz o contato | Você, por conta própria | Você envia os rascunhos que o robô preparou |
 
+Sem Claude Code (plano grátis)? A mesma planilha, com um rascunho de mensagem por empresa, sai pelo [Modo web](00-sem-instalar.md), no navegador.
+
 O `/build-company-list` **não precisa de LinkedIn**: o preflight dele confere só a pasta e o `perfil.local.md`. As fontes são pesquisadas na web; se o Chrome estiver conectado, ele ajuda em páginas que bloqueiam a busca normal (e no LinkedIn Jobs, se já estiver logado). Se não estiver, o robô segue sem ele e anota na aba **Resumo** as fontes que ficaram de fora.
 
 ## Rodando

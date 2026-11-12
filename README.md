@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><b>Demo ao vivo</b></a> ·
+  <a href="docs/web/PROMPT-planilha.md"><b>Sem instalar</b></a> ·
   <a href="#começo-rápido"><b>Começo rápido</b></a> ·
   <a href="docs/guia/01-instalacao.md"><b>Guia</b></a> ·
   <a href="ROADMAP.md"><b>Roadmap</b></a> ·
@@ -29,6 +30,16 @@
 https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
 
 <p align="center"><sub>Painel da demonstração, com dados 100% fictícios. <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Abra a demo ao vivo</a>.</sub></p>
+
+## Qual caminho é o seu?
+
+| Sua conta | O que você consegue | O que precisa | Comece aqui |
+|---|---|---|---|
+| Claude grátis | Lista de empresas reais com fonte, em Excel, e um rascunho de mensagem para cada uma | Só o navegador, nada para instalar | [Modo web](docs/web/PROMPT-planilha.md) |
+| Claude Pro ou superior, sem LinkedIn | Planilha completa pelo Claude Code, sem limite de lote | Claude Code + computador (macOS, Linux ou Windows) | [Começo rápido](#começo-rápido) |
+| Claude Pro ou superior + LinkedIn | Robô completo: rodadas de 10, rascunhos e painel | Claude Code + Chrome com a extensão Claude in Chrome + LinkedIn logado | [Começo rápido](#começo-rápido) |
+
+<sub>Fontes: [web search em todos os planos](https://support.claude.com/en/articles/10684626) · [criação de arquivos em todos os planos](https://support.claude.com/en/articles/12111783) · [Claude in Chrome nos planos pagos](https://support.claude.com/en/articles/12012173) · [planos e preços](https://claude.com/pricing).</sub>
 
 ## Antes × Depois
 
@@ -53,6 +64,11 @@ https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
     <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Painel automático</b><br>Ao fim de cada rodada abre um painel com a rodada, o projeto inteiro, quem respondeu e os follow-ups.</td>
     <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Economia de tokens com RTK</b><br>O instalador liga o <a href="https://github.com/rtk-ai/rtk">RTK</a>, que enxuga a saída dos comandos antes de ela chegar ao Claude.</td>
   </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icons/web.svg" width="40" alt=""><br><b>Modo web, sem instalar</b><br>No plano grátis do Claude, um texto para colar no <a href="docs/web/PROMPT-planilha.md">claude.ai</a> devolve a planilha em Excel, com fonte e um rascunho de mensagem por empresa.</td>
+    <td width="33%"></td>
+    <td width="33%"></td>
+  </tr>
 </table>
 
 ## Como funciona
@@ -72,14 +88,17 @@ O `perfil.local.md` é a única fonte de verdade sobre você (histórico com dat
 </picture>
 <p align="center"><sub>Números do uso real do autor.</sub></p>
 
-## Dois jeitos de usar
+## Três jeitos de usar
 
-| | **Só a planilha** | **Planilha + robô** |
-|---|---|---|
-| Comando | `/build-company-list` | `/build-company-list` e depois `/next-companies` a cada rodada |
-| Precisa de LinkedIn? | Não | Sim, logado no Chrome (extensão Claude in Chrome) |
-| O que você recebe | Empresas reais que usam a sua tecnologia, cada uma com evidência e link da fonte | O fluxo completo: rodadas de 10 empresas, vagas avaliadas, rascunhos de LinkedIn e e-mail e o painel |
-| Quem faz o contato | Você, por conta própria | Você envia os rascunhos que o robô preparou |
+| | **Modo web** | **Só a planilha** | **Planilha + robô** |
+|---|---|---|---|
+| Onde roda | Numa conversa no claude.ai | No Claude Code, na pasta do projeto | No Claude Code + o seu Chrome |
+| Como começa | Colando o [texto do Modo web](docs/web/PROMPT-planilha.md) | `/build-company-list` | `/build-company-list` e depois `/next-companies` a cada rodada |
+| Ritmo | Até 25 empresas por conversa; para continuar, anexe a planilha numa conversa nova | Uma pesquisa até as fontes se esgotarem | Rodadas de 10 empresas, com memória entre elas |
+| Mensagens | Um rascunho de primeira mensagem por empresa, dentro da planilha | Nenhuma: você escreve | Rascunhos de LinkedIn e e-mail por pessoa, vagas avaliadas e currículo ajustado |
+| Quem faz o contato | Você | Você | Você envia os rascunhos que o robô preparou |
+
+As três planilhas têm as mesmas colunas: dá para começar no Modo web e [levar a planilha para o Claude Code depois](docs/guia/00-sem-instalar.md#e-depois).
 
 ## Começo rápido
 
@@ -145,15 +164,19 @@ O que já foi validado em cada sistema:
 
 Usa Linux ou Windows? Rode o fluxo completo e [conte como foi numa issue](https://github.com/roni-clei-santos/ai-company-prospector/issues/new?template=relato-de-sistema.md). Isso ajuda muito o projeto.
 
-| Sistema | Você precisa de |
+| Caminho | Você precisa de |
 |---|---|
-| Todos | [Claude Code](https://code.claude.com/docs/en/setup) logado e Git |
-| Só no modo "Planilha + robô" | Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn logada nesse Chrome. O Gmail logado só é preciso se você escolher `modo_email: "gmail_rascunho"`; com `"arquivo"`, os e-mails ficam em `rascunhos/email/` |
+| Modo web | Uma conta no [claude.ai](https://claude.ai) (a grátis serve) com "Code execution and file creation" ligado em Settings > Capabilities ([guia](docs/guia/00-sem-instalar.md)) |
+| Só a planilha | [Claude Code](https://code.claude.com/docs/en/setup) logado e Git, mais o que o seu sistema pede (tabela abaixo) |
+| Planilha + robô | Tudo de "Só a planilha", mais o Google Chrome com a extensão Claude in Chrome ([guia](docs/guia/03-chrome.md)) e uma conta no LinkedIn logada nesse Chrome. O Gmail logado só é preciso se você escolher `modo_email: "gmail_rascunho"`; com `"arquivo"`, os e-mails ficam em `rascunhos/email/` |
+
+| Sistema (Claude Code) | Você precisa de |
+|---|---|
 | macOS 13+ | [Homebrew](https://brew.sh) (o instalador cuida do Python 3 e do RTK) |
 | Linux | `sudo` e `apt`, `dnf` ou `pacman`, ou Python 3.9+ com `pip` já instalados |
 | Windows 10+ | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) ou `winget install Python.Python.3.12`) |
 
-Passo a passo completo: [docs/guia](docs/guia/01-instalacao.md).
+Passo a passo completo: [docs/guia](docs/guia/01-instalacao.md) (sem instalar nada: [00-sem-instalar](docs/guia/00-sem-instalar.md)).
 
 ## Princípios
 
@@ -176,7 +199,7 @@ O agente só lê, no seu Chrome já logado, telas que você mesmo veria: convite
 <details>
 <summary><b>Posso usar sem conectar meu LinkedIn?</b></summary>
 
-Sim, no modo "Só a planilha". O `/build-company-list` não precisa de LinkedIn: você recebe empresas reais que usam a sua tecnologia, cada uma com evidência e link da fonte, e faz o contato você mesmo. O LinkedIn logado no Chrome só é exigido no modo "Planilha + robô" (`/next-companies`), com rodadas de 10, rascunhos e painel.
+Sim, de dois jeitos. No [Modo web](docs/web/PROMPT-planilha.md), sem instalar nada. Ou no modo "Só a planilha": o `/build-company-list` não precisa de LinkedIn: você recebe empresas reais que usam a sua tecnologia, cada uma com evidência e link da fonte, e faz o contato você mesmo. O LinkedIn logado no Chrome só é exigido no modo "Planilha + robô" (`/next-companies`), com rodadas de 10, rascunhos e painel.
 </details>
 
 <details>
@@ -189,6 +212,18 @@ Não. Mensagens de LinkedIn e e-mails são sempre rascunhos. A única ação que
 <summary><b>Funciona para outra tecnologia além de Magento?</b></summary>
 
 Sim. O `/build-company-list` pergunta a tecnologia e o país e monta a planilha `empresas-<tecnologia>-<país>.xlsx`, e as regras do agente são genéricas. Magento / Adobe Commerce é só o caso de uso do autor.
+</details>
+
+<details>
+<summary><b>Preciso pagar alguma coisa?</b></summary>
+
+O projeto é grátis (licença MIT). O que muda é o plano do Claude:
+
+- **Claude grátis:** o [Modo web](docs/web/PROMPT-planilha.md) entrega a lista de empresas reais com fonte, em Excel, e um rascunho de mensagem para cada uma. Só precisa do navegador.
+- **Claude Pro ou superior, sem LinkedIn:** a planilha completa pelo Claude Code, sem limite de lote. Precisa do Claude Code num computador (macOS, Linux ou Windows).
+- **Claude Pro ou superior + LinkedIn:** o robô completo, com rodadas de 10, rascunhos e painel. Precisa do Claude Code e do Chrome com a extensão Claude in Chrome, com o LinkedIn logado.
+
+<sub>Fontes: [web search em todos os planos](https://support.claude.com/en/articles/10684626) · [criação de arquivos em todos os planos](https://support.claude.com/en/articles/12111783) · [Claude in Chrome nos planos pagos](https://support.claude.com/en/articles/12012173) · [planos e preços](https://claude.com/pricing).</sub>
 </details>
 
 <details>

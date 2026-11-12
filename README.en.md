@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><b>Live demo</b></a> ·
+  <a href="docs/web/PROMPT-planilha.en.md"><b>No install</b></a> ·
   <a href="#quick-start"><b>Quick start</b></a> ·
   <a href="docs/guia/01-instalacao.md"><b>Guide (PT)</b></a> ·
   <a href="ROADMAP.md"><b>Roadmap</b></a> ·
@@ -29,6 +30,16 @@
 https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
 
 <p align="center"><sub>Demo dashboard with 100% fictitious data (in Portuguese). <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Open the live demo</a>.</sub></p>
+
+## Which path is yours?
+
+| Your account | What you get | What you need | Start here |
+|---|---|---|---|
+| Claude Free | A list of real companies with sources, in Excel, and a draft message for each one | Just the browser, nothing to install | [Web mode](docs/web/PROMPT-planilha.en.md) |
+| Claude Pro or higher, no LinkedIn | The full spreadsheet through Claude Code, no batch limit | Claude Code + a computer (macOS, Linux or Windows) | [Quick start](#quick-start) |
+| Claude Pro or higher + LinkedIn | The full robot: rounds of 10, drafts and dashboard | Claude Code + Chrome with the Claude in Chrome extension + LinkedIn logged in | [Quick start](#quick-start) |
+
+<sub>Sources: [web search on all plans](https://support.claude.com/en/articles/10684626) · [file creation on all plans](https://support.claude.com/en/articles/12111783) · [Claude in Chrome on paid plans](https://support.claude.com/en/articles/12012173) · [plans and pricing](https://claude.com/pricing).</sub>
 
 ## Before × After
 
@@ -53,6 +64,11 @@ https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
     <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Automatic dashboard</b><br>Each round ends with a dashboard: the round, the whole project, who replied and dated follow-ups.</td>
     <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Token savings with RTK</b><br>The installer sets up <a href="https://github.com/rtk-ai/rtk">RTK</a>, which trims command output before it reaches Claude.</td>
   </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icons/web.svg" width="40" alt=""><br><b>Web mode, nothing to install</b><br>On Claude's free plan, a text you paste into <a href="docs/web/PROMPT-planilha.en.md">claude.ai</a> returns the Excel spreadsheet, with sources and a draft message per company.</td>
+    <td width="33%"></td>
+    <td width="33%"></td>
+  </tr>
 </table>
 
 ## How it works
@@ -72,14 +88,17 @@ https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
 </picture>
 <p align="center"><sub>Numbers from the author's real use.</sub></p>
 
-## Two ways to use it
+## Three ways to use it
 
-| | **Spreadsheet only** | **Spreadsheet + robot** |
-|---|---|---|
-| Command | `/build-company-list` | `/build-company-list`, then `/next-companies` every round |
-| Needs LinkedIn? | No | Yes, logged in on Chrome (Claude in Chrome extension) |
-| What you get | Real companies using your tech stack, each with evidence and a source link | The full flow: rounds of 10 companies, jobs scored, LinkedIn and email drafts and the dashboard |
-| Who reaches out | You, on your own | You send the drafts the robot prepared |
+| | **Web mode** | **Spreadsheet only** | **Spreadsheet + robot** |
+|---|---|---|---|
+| Where it runs | In a claude.ai chat | In Claude Code, in the project folder | In Claude Code + your Chrome |
+| How it starts | Pasting the [web mode text](docs/web/PROMPT-planilha.en.md) | `/build-company-list` | `/build-company-list`, then `/next-companies` every round |
+| Pace | Up to 25 companies per chat; to continue, attach the spreadsheet in a new chat | One search until the sources run out | Rounds of 10 companies, with memory between them |
+| Messages | One draft first message per company, inside the spreadsheet | None: you write them | LinkedIn and email drafts per person, jobs scored and a tailored résumé |
+| Who reaches out | You | You | You send the drafts the robot prepared |
+
+All three spreadsheets have the same columns: you can start in web mode and [take the spreadsheet to Claude Code later](docs/guia/00-sem-instalar.md#e-depois) (guide in Portuguese).
 
 ## Quick start
 
@@ -145,10 +164,14 @@ What has been validated on each system:
 
 On Linux or Windows? Run the full flow and [tell us how it went in an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues/new?template=relato-de-sistema.md). It helps the project a lot.
 
-| System | You need |
+| Path | You need |
 |---|---|
-| All | [Claude Code](https://code.claude.com/docs/en/setup) logged in and Git |
-| "Spreadsheet + robot" only | Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account logged in on that Chrome. A logged-in Gmail is only needed if you choose `modo_email: "gmail_rascunho"`; with `"arquivo"`, emails stay in `rascunhos/email/` |
+| Web mode | A [claude.ai](https://claude.ai) account (Free works) with "Code execution and file creation" on in Settings > Capabilities ([how to](docs/web/PROMPT-planilha.en.md)) |
+| Spreadsheet only | [Claude Code](https://code.claude.com/docs/en/setup) logged in and Git, plus what your system needs (table below) |
+| Spreadsheet + robot | Everything in "Spreadsheet only", plus Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account logged in on that Chrome. A logged-in Gmail is only needed if you choose `modo_email: "gmail_rascunho"`; with `"arquivo"`, emails stay in `rascunhos/email/` |
+
+| System (Claude Code) | You need |
+|---|---|
 | macOS 13+ | [Homebrew](https://brew.sh) (the installer takes care of Python 3 and RTK) |
 | Linux | `sudo` and `apt`, `dnf` or `pacman`, or Python 3.9+ with `pip` already installed |
 | Windows 10+ | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.12`) |
@@ -176,7 +199,7 @@ The agent only reads, in your own logged-in Chrome, screens you would see yourse
 <details>
 <summary><b>Can I use it without connecting my LinkedIn?</b></summary>
 
-Yes, in "Spreadsheet only" mode. `/build-company-list` does not need LinkedIn: you get real companies using your tech stack, each with evidence and a source link, and you reach out yourself. A LinkedIn account logged in on Chrome is only required for "Spreadsheet + robot" (`/next-companies`), with rounds of 10, drafts and the dashboard.
+Yes, in two ways. In [web mode](docs/web/PROMPT-planilha.en.md), with nothing to install. Or in "Spreadsheet only" mode: `/build-company-list` does not need LinkedIn: you get real companies using your tech stack, each with evidence and a source link, and you reach out yourself. A LinkedIn account logged in on Chrome is only required for "Spreadsheet + robot" (`/next-companies`), with rounds of 10, drafts and the dashboard.
 </details>
 
 <details>
@@ -189,6 +212,18 @@ No. LinkedIn messages and emails are always drafts. The only action it may take 
 <summary><b>Does it work for a stack other than Magento?</b></summary>
 
 Yes. `/build-company-list` asks for the technology and the country and builds `empresas-<technology>-<country>.xlsx`, and the agent rules are generic. Magento / Adobe Commerce is just the author's use case.
+</details>
+
+<details>
+<summary><b>Do I need to pay for anything?</b></summary>
+
+The project is free (MIT license). What changes is your Claude plan:
+
+- **Claude Free:** [web mode](docs/web/PROMPT-planilha.en.md) gives you a list of real companies with sources, in Excel, and a draft message for each one. You only need the browser.
+- **Claude Pro or higher, no LinkedIn:** the full spreadsheet through Claude Code, no batch limit. You need Claude Code on a computer (macOS, Linux or Windows).
+- **Claude Pro or higher + LinkedIn:** the full robot, with rounds of 10, drafts and dashboard. You need Claude Code and Chrome with the Claude in Chrome extension, with LinkedIn logged in.
+
+<sub>Sources: [web search on all plans](https://support.claude.com/en/articles/10684626) · [file creation on all plans](https://support.claude.com/en/articles/12111783) · [Claude in Chrome on paid plans](https://support.claude.com/en/articles/12012173) · [plans and pricing](https://claude.com/pricing).</sub>
 </details>
 
 <details>
