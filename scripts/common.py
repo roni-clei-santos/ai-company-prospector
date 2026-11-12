@@ -91,9 +91,7 @@ def normalize_url_text(text):
                   lambda m: normalize_url(m.group(0)), text)
 
 
-PANEL_PORTS = range(47321, 47331)   # fixed address of the panel server: 47321, then 47322..47330 if taken
-TOKEN_FILE = Path("controle") / ".painel-token"
-SERVER_JS = Path("painel") / "servidor.js"
+PANEL_STATE = Path("controle") / ".painel-servidor.json"   # {pid, porta, iniciado_em} of the running panel server
 NO_PROJECT = "Não achei o projeto. Rode o instalador na pasta do projeto."
 
 
@@ -165,36 +163,66 @@ def project_root():
     return find_project() or Path.cwd().resolve()
 
 
-def painel_token(root):
-    """Persistent token of the panel server: controle/.painel-token (32 random bytes in hex), created once."""
-    import secrets
-    path = Path(root) / TOKEN_FILE
+def pid_alive(pid):
+    """True if a process with this id is running (macOS, Linux and Windows)."""
     try:
-        token = path.read_text(encoding="utf-8").strip()
-        if re.fullmatch(r"[0-9a-f]{64}", token):
-            return token
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def panel_state(root):
+    """{pid, porta, iniciado_em} of the panel server of this project, or None. A file left by a server that is
+    no longer running (or unreadable) is deleted."""
+    path = Path(root) / PANEL_STATE
+    try:
+        info = json.loads(path.read_text(encoding="utf-8"))
+        if pid_alive(info["pid"]) and int(info["porta"]) > 0:
+            return info
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    try:
+        path.unlink()
     except OSError:
         pass
-    path.parent.mkdir(parents=True, exist_ok=True)
-    token = secrets.token_hex(32)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(token + "\n")
-    return token
+    return None
 
 
-def server_js(port, token):
-    return "window.PAINEL_SERVIDOR = " + json.dumps({"url": f"http://127.0.0.1:{port}", "token": token}) + ";\n"
-
-
-def write_server_js(root, port, token):
-    """painel/servidor.js: address and token of the local server, loaded by the panel with <script src>."""
-    path = Path(root) / SERVER_JS
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".js.tmp")
-    tmp.write_text(server_js(port, token), encoding="utf-8")
-    os.replace(tmp, path)
-    return path
+def panel_url(root, timeout=2.0):
+    """http://127.0.0.1:<porta>/ of the panel server of this project when it answers /api/estado (200, same
+    pid) within `timeout` seconds, else None."""
+    import urllib.request
+    info = panel_state(root)
+    if not info:
+        return None
+    base = f"http://127.0.0.1:{int(info['porta'])}"
+    try:
+        with urllib.request.urlopen(base + "/api/estado", timeout=timeout) as r:
+            if r.status == 200 and json.loads(r.read().decode("utf-8")).get("pid") == int(info["pid"]):
+                return base + "/"
+    except (OSError, ValueError):
+        pass
+    return None
 
 
 def split_status(raw):

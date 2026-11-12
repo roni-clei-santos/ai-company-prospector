@@ -29,7 +29,7 @@ def test_prompt_status_list_matches_code():
 
 
 def test_every_status_has_a_panel_label():
-    html = (REPO / "painel" / "index.html").read_text(encoding="utf-8")
+    html = (REPO / "scripts" / "painel_template.html").read_text(encoding="utf-8")
     for status in common.OFFICIAL_STATUSES:
         assert f"{status}:" in html, status
 

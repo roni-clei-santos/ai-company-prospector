@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="painel-data" content="data.json">
+<meta name="referrer" content="no-referrer">
+<title>Painel da prospecção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0B1F3A;
+    --navy-2: #12294A;
+    --navy-3: #1B375F;
+    --line: #26446F;
+    --orange: #FF7A1A;
+    --orange-soft: rgba(255, 122, 26, .14);
+    --ink: #F4F7FB;
+    --ink-2: #B9C6D8;
+    --ink-3: #8597B0;
+    --neutral: #5B7090;
+    --ok: #3DD68C;
+    --warn: #FFC145;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--navy); color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--orange); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+  /* sticky footer: short tabs push the footer (and the rainbow strip) to the bottom of the window */
+  .page { display: flex; flex-direction: column; min-height: 100vh; }
+  .page > main { flex: 1 0 auto; width: 100%; }
+
+  header.top { padding: 28px 0 8px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 4px var(--orange-soft); }
+  h1 { margin: 10px 0 4px; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; font-weight: 800; letter-spacing: -.02em; }
+  h1 em { font-style: normal; color: var(--orange); }
+  .sub { color: var(--ink-3); font-size: 13px; }
+  .demo-flag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--orange-soft); color: var(--orange); font-weight: 700; font-size: 11px; letter-spacing: .06em; }
+
+  nav.tabs { position: sticky; top: 0; z-index: 5; background: rgba(11, 31, 58, .92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); margin-top: 18px; }
+  nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  nav.tabs a { flex: none; padding: 14px 14px 12px; color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 14px; border-bottom: 2px solid transparent; }
+  nav.tabs a.on { color: var(--ink); border-bottom-color: var(--orange); }
+
+  section { padding: 34px 0 10px; scroll-margin-top: 56px; }
+  h2 { font-size: 20px; margin: 0 0 16px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  h2 small { color: var(--ink-3); font-weight: 500; font-size: 13px; }
+  h3 { font-size: 14px; margin: 0 0 12px; color: var(--ink-2); font-weight: 600; }
+
+  .grid { display: grid; gap: 14px; }
+  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .two { grid-template-columns: 1fr; } }
+
+  .card { background: var(--navy-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+  .kpi .label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .kpi .value { font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .value.accent { color: var(--orange); }
+  .kpi .hint { color: var(--ink-3); font-size: 12px; }
+
+  .progress { height: 10px; border-radius: 999px; background: var(--navy-3); overflow: hidden; margin: 10px 0 6px; }
+  .progress > span { display: block; height: 100%; background: var(--orange); border-radius: 999px; transition: width .8s ease; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-3); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll-x { overflow-x: auto; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--navy-3); color: var(--ink-2); white-space: nowrap; }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--neutral); }
+  .pill.s-good::before { background: var(--orange); }
+  .pill.s-good { color: var(--ink); }
+
+  ol.todo { margin: 0; padding-left: 20px; }
+  ol.todo li { margin: 0 0 8px; color: var(--ink); }
+  ol.todo li::marker { color: var(--orange); font-weight: 700; }
+  ol.todo ul.sub { margin: 6px 0 0; padding-left: 0; list-style: none; }
+  ol.todo ul.sub li { margin: 0 0 4px; color: var(--ink-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+  ol.todo ul.sub li::before { content: "↳ "; color: var(--orange); }
+
+  .chart { width: 100%; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .bar { fill: var(--orange); transition: opacity .15s; }
+  .chart .bar.muted { fill: var(--neutral); }
+  .chart .bar-bg { fill: var(--navy-3); }
+  .chart .hit { fill: transparent; cursor: default; }
+  .chart .lbl { fill: var(--ink-2); font-size: 12px; font-family: inherit; }
+  .chart .val { fill: var(--ink); font-size: 12px; font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums; }
+  .chart .axis { stroke: var(--line); stroke-width: 1; }
+  .chart g.row:hover .bar { opacity: .82; }
+  .toggle { background: none; border: 1px solid var(--line); color: var(--ink-2); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; float: right; }
+  .toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+  .tbl-view { display: none; }
+  .card.show-table .tbl-view { display: block; }
+  .card.show-table .chart { display: none; }
+
+  #tip { position: fixed; pointer-events: none; z-index: 20; background: #fff; color: #0B1F3A; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.35); opacity: 0; transform: translateY(4px); transition: opacity .1s, transform .1s; }
+  #tip.on { opacity: 1; transform: none; }
+
+  .list { display: grid; gap: 10px; }
+  .item { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 12px; background: var(--navy-2); border: 1px solid var(--line); }
+  .item .badge { flex: none; min-width: 64px; text-align: center; padding: 6px 8px; border-radius: 10px; background: var(--navy-3); font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .item .badge.due { background: var(--orange); color: var(--navy); }
+  .item .meta { color: var(--ink-3); font-size: 12px; }
+  .empty { color: var(--ink-3); font-size: 14px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
+
+  footer { margin-top: 40px; padding: 18px 0 26px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+  footer .author { margin-top: 6px; }
+  footer .author a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 2px; }
+  footer .author a:hover { color: var(--orange); text-decoration-color: var(--orange); }
+  .pride { height: 4px; background: linear-gradient(90deg, #E40303, #FF8C00, #FFED00, #008026, #24408E, #732982); }
+
+  .fade { animation: fade .5s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+  .loading { padding: 80px 0; text-align: center; color: var(--ink-3); }
+  section[hidden] { display: none; }
+
+  /* ---------- Pendentes ---------- */
+  .hero { padding: 22px; }
+  .hero .label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .hero .big { margin: 8px 0 14px; font-size: clamp(20px, 3vw, 28px); line-height: 1.3; font-weight: 700; letter-spacing: -.01em; }
+  .hero .big b { color: var(--orange); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--navy-3); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .chip b { color: var(--orange); font-variant-numeric: tabular-nums; }
+  .chip:hover { border-color: var(--ink-3); }
+  .check-line { margin-top: 12px; color: var(--ink-3); font-size: 12px; }
+  .seal { margin-top: 12px; font-size: 12px; font-weight: 600; }
+  .seal.ok { color: rgba(61, 214, 140, .8); }
+  .seal.bad { color: #FF7A1A; }
+  .seal.bad summary { cursor: pointer; list-style: none; }
+  .seal.bad summary::-webkit-details-marker { display: none; }
+  .seal.bad ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); font-weight: 500; }
+  h2.group { margin-top: 30px; scroll-margin-top: 64px; }
+  h2.group .count { display: inline-block; min-width: 26px; padding: 1px 9px; border-radius: 999px; background: var(--orange-soft); color: var(--orange); font-size: 13px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+  .task { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 16px; border-radius: 12px; background: var(--navy-2); border: 1px solid var(--line); transition: opacity .2s; }
+  .task .n { min-width: 34px; height: 34px; padding: 0 6px; border-radius: 10px; background: var(--navy-3); display: grid; place-items: center; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .task .n.due { background: var(--orange); color: var(--navy); }
+  .task .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .task .company { color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .task .who { margin-top: 2px; font-size: 15px; }
+  .task .who b { font-weight: 700; }
+  .task .who span { color: var(--ink-2); }
+  .task .meta { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+  .msg { margin: 10px 0 0; padding: 12px 14px; border-left: 3px solid var(--orange); border-radius: 0 10px 10px 0; background: var(--navy); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .msg-label { margin-top: 10px; color: var(--ink-3); font-size: 12px; font-weight: 600; }
+  details.after { margin-top: 10px; }
+  details.after summary { cursor: pointer; color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--navy-3); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn.primary { background: var(--orange); border-color: var(--orange); color: var(--navy); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.copied { background: var(--ok); border-color: var(--ok); color: var(--navy); }
+  .pill.kind-convite::before { background: var(--warn); }
+  .pill.kind-mensagem::before { background: var(--ok); }
+  .done-box { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 9px; border: 1px solid var(--line); color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+  .done-box input { width: 16px; height: 16px; accent-color: var(--ok); margin: 0; cursor: pointer; }
+  .task.done { opacity: .5; }
+  .task.done .head, .task.done .who, .task.done .msg, .task.done .meta, .task.done .line { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+  .task.done .done-box { color: var(--ok); border-color: var(--ok); }
+  .line { font-size: 14px; }
+  .mode-line { margin: 0 0 12px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--navy-2); color: var(--ink-2); font-size: 13px; font-weight: 600; }
+  .mode-line.on { border-color: rgba(61, 214, 140, .45); color: var(--ok); }
+  .mode-line.bad { border-color: rgba(255, 193, 69, .5); color: var(--warn); }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 30; max-width: min(640px, calc(100vw - 32px));
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--navy-2); color: var(--ink); font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .toast.on { border-color: rgba(61, 214, 140, .55); color: var(--ok); }
+  .toast.bad { border-color: rgba(255, 193, 69, .6); color: var(--warn); }
+  .toast[hidden] { display: none; }
+  .task .n.ok { background: var(--ok); color: var(--navy); }
+  .task.sent { opacity: .9; }
+  .line code { color: var(--ink-2); }
+  @media (max-width: 640px) {
+    .task { grid-template-columns: auto minmax(0, 1fr); }
+    .task .done-box { grid-column: 2; justify-self: start; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> Prospecção de empresas</div>
+    <h1 id="headline">Carregando o painel…</h1>
+    <div class="sub" id="generated"></div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Seções">
+  <div class="wrap">
+    <a href="#pendentes" class="on">Pendentes</a>
+    <a href="#rodada">Última rodada</a>
+    <a href="#projeto">Projeto inteiro</a>
+    <a href="#responderam">Responderam</a>
+    <a href="#followups">Follow-ups com data</a>
+  </div>
+</nav>
+
+<main class="wrap" id="app">
+  <div class="loading" id="loading">Lendo os dados…</div>
+</main>
+
+<div id="tip" role="tooltip"></div>
+<div id="aviso" class="toast" role="status" hidden></div>
+<footer>
+  <div class="wrap" id="foot">Gerado por <code>scripts/gerar_painel.py</code>. A IA rascunha, você decide e envia.
+    <div class="author">Feito por Roni Clei Santos · <a href="https://www.linkedin.com/in/roni-clei-santos/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">Dar uma estrela no projeto</a></div></div>
+</footer>
+<div class="pride" aria-hidden="true"></div>
+</div>
+
+<script>window.PAINEL_SERVIDOR = { token: "__PAINEL_TOKEN__" };</script>
+<script>
+(function () {
+  "use strict";
+
+  const STATUS = {
+    CANDIDATURA_ENVIADA: "Candidatura enviada",
+    RASCUNHOS_CRIADOS: "Rascunhos criados",
+    VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR: "Vaga de gestão (você decide)",
+    JA_CONTATADA_SEM_NOVA_ACAO: "Já contatada",
+    SEM_OPORTUNIDADE: "Sem oportunidade",
+    NAO_ELEGIVEL: "Não elegível",
+    PULADA_PELO_CANDIDATO: "Pulada por você",
+    DESISTENCIA_DO_CANDIDATO: "Você desistiu",
+    PRECISA_DO_CANDIDATO: "Precisa de você",
+    AGUARDANDO_RESPOSTA_CANDIDATO: "Aguardando sua resposta",
+    ERRO: "Erro",
+    NAO_CONTATAR: "Não contatar",
+    FALTA_PROCESSAR: "Falta processar"
+  };
+  const GOOD = new Set(["CANDIDATURA_ENVIADA", "RASCUNHOS_CRIADOS", "VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR"]);
+  const label = s => STATUS[s] || (s || "").replace(/_/g, " ").toLowerCase();
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const br = iso => { if (!iso) return "—"; const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
+  const short = iso => { if (!iso) return "—"; const [, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}`; };
+  // to-do item: plain string (old data.json) or {texto, subitens}
+  const todoItem = t => {
+    if (typeof t === "string") return `<li>${esc(t)}</li>`;
+    const subs = (t.subitens || []).map(x => `<li>${esc(x)}</li>`).join("");
+    return `<li>${esc(t.texto)}${subs ? `<ul class="sub">${subs}</ul>` : ""}</li>`;
+  };
+  const pill = s => `<span class="pill ${GOOD.has(s) ? "s-good" : ""}">${esc(label(s))}</span>`;
+
+  // ---------- tooltip ----------
+  const tip = document.getElementById("tip");
+  function bindTips(root) {
+    root.querySelectorAll("[data-tip]").forEach(el => {
+      el.addEventListener("mousemove", e => {
+        tip.textContent = el.getAttribute("data-tip");
+        tip.classList.add("on");
+        const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+        tip.style.left = x + "px"; tip.style.top = (e.clientY - 36) + "px";
+      });
+      el.addEventListener("mouseleave", () => tip.classList.remove("on"));
+    });
+  }
+
+  // ---------- horizontal bars (single series) ----------
+  function hbars(rows, opts) {
+    opts = opts || {};
+    const W = Math.min(560, Math.max(300, window.innerWidth - 72));
+    const labelW = Math.min(opts.labelW || 190, Math.round(W * 0.42)), valW = 44, rowH = 30, barH = 14;
+    const max = Math.max(1, ...rows.map(r => opts.max || r.value));
+    const plotW = W - labelW - valW;
+    const H = rows.length * rowH + 4;
+    let g = "";
+    rows.forEach((r, i) => {
+      const y = i * rowH + 4, w = Math.max(r.value ? 4 : 0, (r.value / max) * plotW);
+      const maxCh = Math.floor((labelW - 12) / 6.4); const lbl = r.label.length > maxCh ? r.label.slice(0, maxCh - 1) + "…" : r.label;
+      g += `<g class="row" data-tip="${esc(r.tip || r.label + ": " + r.value)}">
+        <rect class="hit" x="0" y="${y - 6}" width="${W}" height="${rowH}"></rect>
+        <text class="lbl" x="${labelW - 10}" y="${y + barH - 2}" text-anchor="end">${esc(lbl)}</text>
+        ${opts.track ? `<rect class="bar-bg" x="${labelW}" y="${y}" width="${plotW}" height="${barH}" rx="4"></rect>` : ""}
+        <rect class="bar ${r.muted ? "muted" : ""}" x="${labelW}" y="${y}" width="${w}" height="${barH}" rx="4"></rect>
+        <text class="val" x="${labelW + w + 8}" y="${y + barH - 2}">${esc(r.display != null ? r.display : r.value)}</text>
+      </g>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria || "")}">${g}</svg>`;
+  }
+
+  // ---------- columns over time ----------
+  function columns(rows, aria) {
+    const W = 1100, H = 200, padB = 28, padT = 22, gap = 2;
+    const n = Math.max(rows.length, 1);
+    const max = Math.max(1, ...rows.map(r => r.value));
+    const slot = W / n, bw = Math.min(48, slot * 0.6);
+    let g = `<line class="axis" x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}"></line>`;
+    rows.forEach((r, i) => {
+      const h = Math.max(4, (r.value / max) * (H - padB - padT));
+      const x = i * slot + (slot - bw) / 2, y = H - padB - h;
+      g += `<g class="row" data-tip="${esc(br(r.date) + ": " + r.value + " empresas")}">
+        <rect class="hit" x="${i * slot}" y="0" width="${slot - gap}" height="${H}"></rect>
+        <path class="bar" d="M${x},${H - padB} V${y + 4} q0,-4 4,-4 H${x + bw - 4} q4,0 4,4 V${H - padB} Z"></path>
+        <text class="val" x="${x + bw / 2}" y="${y - 6}" text-anchor="middle">${r.value}</text>
+        <text class="lbl" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${esc(short(r.date))}</text>
+      </g>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${g}</svg>`;
+  }
+
+  function tableView(head, rows) {
+    return `<div class="tbl-view scroll-x"><table><thead><tr>${head.map((h, i) => `<th class="${i ? "num" : ""}">${esc(h)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? "num" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  }
+
+  function chartCard(title, svg, head, rows) {
+    return `<div class="card"><button class="toggle" type="button">Ver tabela</button><h3>${esc(title)}</h3>
+      <div class="chart">${svg}</div>${tableView(head, rows)}</div>`;
+  }
+
+  // ---------- "Feito": the candidate's click is the source of truth ----------
+  // Served by scripts/servidor_painel.py (http://127.0.0.1, this computer only). Feito and Desfazer write to
+  // the project at once. The screen is redrawn ONLY after a click of the candidate or a tab change: never by
+  // itself. A heartbeat every 30 s keeps the server on (and redraws nothing); closing the tab turns it off.
+  // Demo (GitHub Pages, no server): the "Feito" only strikes the item on screen.
+  const SRV = window.PAINEL_SERVIDOR && window.PAINEL_SERVIDOR.token && window.PAINEL_SERVIDOR.token !== "__PAINEL" + "_TOKEN__"
+    ? window.PAINEL_SERVIDOR : null;
+  const PAGE_ID = Math.random().toString(36).slice(2, 12);
+  const ENDED = "O painel foi encerrado. Rode /painel para abrir de novo.";
+  let MODE = SRV ? "servidor" : "demo";
+  let DATA = null;
+  let ENCERRADO = false;
+  let beat = null;
+  async function api(path, body) {
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 5000);
+    let r;
+    try {
+      r = await fetch(path, { method: body ? "POST" : "GET", cache: "no-store", signal: ctrl.signal, body: body ? JSON.stringify(body) : undefined,
+        headers: Object.assign({ "X-Painel-Token": SRV.token }, body ? { "Content-Type": "application/json" } : {}) });
+    } catch (e) {
+      const timeout = e && e.name === "AbortError";
+      const err = new Error(timeout ? "o painel não respondeu em 5 segundos" : "sem conexão com o painel");
+      err.encerrado = !timeout;
+      throw err;
+    } finally { clearTimeout(timer); }
+    const out = await r.json().catch(() => null);
+    if (!r.ok || !out || out.ok === false) throw new Error((out && out.erro) || ("erro " + r.status));
+    return out;
+  }
+  let toastTimer = null;
+  function avisar(msg, kind, retry) {  // one message area, updated in place (never stacked)
+    const el = document.getElementById("aviso");
+    clearTimeout(toastTimer);
+    el.textContent = msg || "";
+    el.hidden = !msg;
+    el.className = "toast" + (kind ? " " + kind : "");
+    if (retry) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn"; b.textContent = "Tentar de novo"; b.setAttribute("data-retry", "");
+      b.addEventListener("click", () => { avisar(""); retry(); });
+      el.append(b);
+    }
+    if (kind === "on") toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+  }
+  function encerrado() {  // the server is gone: say it once and stop trying
+    if (beat) { clearInterval(beat); beat = null; }
+    if (ENCERRADO) return;
+    ENCERRADO = true;
+    avisar(ENDED, "bad");
+  }
+  function heartbeat() {
+    if (!SRV || beat) return;
+    const ping = () => { if (!ENCERRADO) api("/api/estado", { pagina: PAGE_ID }).catch(e => { if (e.encerrado) encerrado(); }); };
+    ping();
+    beat = setInterval(ping, 30000);
+    window.addEventListener("pagehide", () => {
+      if (ENCERRADO) return;
+      try {
+        navigator.sendBeacon("/api/fechou", new Blob([JSON.stringify({ token: SRV.token, pagina: PAGE_ID })], { type: "application/json" }));
+      } catch (e) { /* the server also stops after 3 minutes without heartbeat */ }
+    });
+  }
+  const rerender = () => { const y = window.scrollY; render(DATA); window.scrollTo({ top: y, behavior: "instant" }); };
+  function act(path, id, el, okMsg) {  // Feito / Desfazer: only this control waits (at most 5 s)
+    if (ENCERRADO) { undoLook(el); avisar(ENDED, "bad"); return; }
+    el.disabled = true;
+    api(path, { id }).then(out => {
+      DATA = out.dados;
+      rerender();
+      avisar(okMsg, "on");
+    }).catch(e => {
+      undoLook(el);
+      if (e.encerrado) return encerrado();
+      avisar("Não consegui gravar: " + e.message + ".", "bad", () => {
+        if (el.type === "checkbox") { el.checked = true; const t = el.closest(".task"); if (t) t.classList.add("done"); }
+        act(path, id, el, okMsg);
+      });
+    });
+  }
+  function undoLook(el) {
+    el.disabled = false;
+    if (el.type === "checkbox") { el.checked = false; const t = el.closest(".task"); if (t) t.classList.remove("done"); }
+  }
+
+  // ---------- copy to clipboard ----------
+  const COPY = [];
+  function copyText(text) {  // -> Promise<boolean>
+    if (navigator.clipboard && window.isSecureContext !== false) {
+      return navigator.clipboard.writeText(text).then(() => true, () => fallbackCopy(text));
+    }
+    return Promise.resolve(fallbackCopy(text));
+  }
+  function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; } finally { ta.remove(); }
+    return ok;
+  }
+  // external links: absolute http(s) only (LinkedIn always https), new tab, rel="noopener"
+  const extUrl = u => { u = String(u || "").trim(); if (!/^https?:\/\/[^\s"'<>]+$/i.test(u)) return null;
+    return u.replace(/^http:\/\/((?:[a-z]{2,3}\.|www\.)?linkedin\.com\/)/i, "https://$1"); };
+  const extLink = (u, lbl, cls) => { const h = extUrl(u); return h ? `<a class="${cls || "btn"}" href="${esc(h)}" target="_blank" rel="noopener">${esc(lbl)}</a>` : ""; };
+  const copyBtn = (text, lbl) => { COPY.push(text); return `<button class="btn primary copy" type="button" data-copy="${COPY.length - 1}">${esc(lbl || "Copiar texto")}</button>`; };
+
+  const plural = (n, one, many) => `<b>${n}</b> ${n === 1 ? one : many}`;
+  const joinPt = parts => parts.length < 2 ? parts.join("") : parts.slice(0, -1).join(", ") + " e " + parts[parts.length - 1];
+  const cap = s => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const doneBox = id => `<label class="done-box"${MODE === "demo" ? ' title="Demonstração: só risca na tela"' : ""}><input type="checkbox" data-done="${esc(id)}"> Feito</label>`;
+  const task = (id, n, body, due) => `<article class="task" data-id="${esc(id)}"><div class="n${due ? " due" : ""}">${n}</div><div>${body}</div>${doneBox(id)}</article>`;
+  const nothing = `<div class="empty">Nada pendente aqui</div>`;
+  const company = it => it.numero != null ? `#${esc(it.numero)}${it.empresa ? " " + esc(it.empresa) : ""}` : esc(it.empresa || "");
+  const fuId = f => f.id || ("fu:" + ((f.numeros && f.numeros.length) ? f.numeros.join(",") : f.quem) + ":" + f.data);
+  const KIND = { linkedin: "LinkedIn", email: "E-mail", followup: "Follow-up", resposta: "Resposta", decisao: "Decisão" };
+  const statusLine = () => MODE === "demo" ? `<div class="mode-line">Demonstração: o "Feito" só risca o item na tela.</div>` : "";
+
+  function renderPending(d) {
+    const p = d.pendentes;
+    if (!p) return `<section id="pendentes" class="fade"><div class="empty">Este painel foi gerado por uma versão antiga do script. Rode <code>python3 scripts/gerar_painel.py</code> de novo para ver os pendentes.</div></section>`;
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const due = (d.followups || []).filter(f => f.data <= today);
+    const replies = p.respostas || [], li = p.linkedin || [], em = p.emails || [], dec = p.decisoes || [], sent = p.enviados_hoje || [];
+    const totals = joinPt([plural(li.length, "mensagem de LinkedIn", "mensagens de LinkedIn"), plural(em.length, "e-mail", "e-mails"),
+      plural(due.length, "follow-up vencido", "follow-ups vencidos"), plural(dec.length, "decisão sua", "decisões suas")]);
+    const c = p.conferencia || {};
+    const diffs = p.conferencia_diferencas || [];
+    const nDiff = Math.max(diffs.reduce((n, x) => n + (parseInt(x.nome, 10) && / NAO_CONTATAR$/.test(x.nome) ? parseInt(x.nome, 10) : 1), 0), Math.abs((c.linkedin_secao4 || 0) - (c.linkedin_painel || 0)));
+    const side = x => x.lado === "relatorio" ? "só no relatório (seção 4)" : "só nesta lista";
+    const check = !c.fonte ? "" : nDiff === 0 ? `<div class="seal ok">✓ Bate com o relatório</div>`
+      : `<details class="seal bad"><summary>⚠ ${nDiff} ${nDiff === 1 ? "diferença" : "diferenças"} com o relatório · <u>ver detalhes</u></summary>
+          <ul>${diffs.map(x => `<li><b>${esc(x.nome)}</b>: ${side(x)}${x.motivo ? ` (${esc(x.motivo)})` : ""}</li>`).join("") || `<li>${esc(c.linkedin_secao4)} no relatório, ${esc(c.linkedin_painel)} nesta lista</li>`}</ul></details>`;
+    const chip = (target, n, lbl) => `<button class="chip" type="button" data-jump="${target}"><b>${n}</b> ${esc(lbl)}</button>`;
+    let h = `<section id="pendentes" class="fade">
+      ${statusLine()}
+      <div class="card hero"><div class="label">O que falta você fazer, de todas as rodadas</div>
+        <p class="big">${totals}</p>
+        <div class="chips">${chip("p-hoje", due.length + replies.length, "Fazer hoje")}${chip("p-linkedin", li.length, "LinkedIn")}${chip("p-emails", em.length, "E-mails")}${chip("p-decisoes", dec.length, "Decisões suas")}${MODE === "servidor" ? chip("p-enviados", sent.length, "Enviados hoje") : ""}</div>
+        ${check}
+      </div>`;
+
+    // b) Fazer hoje
+    const hoje = due.map(f => task(fuId(f), esc(short(f.data)), `<div class="head"><span class="pill s-good">Follow-up</span><span class="company">${f.data < today ? "venceu em " + esc(br(f.data)) : "vence hoje"}</span></div>
+        <div class="who"><b>${esc(f.quem)}</b></div><div class="meta">Só se ainda não houver resposta. Marcado na rodada de ${esc(br(f.rodada))}.</div>`, true))
+      .concat(replies.map(r => task(r.id, "↩", `<div class="head"><span class="pill s-good">Resposta</span><span class="company">vista na rodada de ${esc(br(r.rodada))}</span></div>
+        <div class="who">${esc(r.texto)}</div><div class="meta">Pede uma ação sua.</div>`, true)));
+    h += `<h2 class="group" id="p-hoje">Fazer hoje <span class="count">${hoje.length}</span><small>follow-ups vencidos e respostas que pedem ação</small></h2>
+      ${hoje.length ? `<div class="list">${hoje.join("")}</div>` : nothing}`;
+
+    // c) LinkedIn
+    h += `<h2 class="group" id="p-linkedin">LinkedIn <span class="count">${li.length}</span><small>na ordem de prioridade do PROMPT (seção 6)</small></h2>`;
+    h += li.length ? `<div class="list">${li.map(it => {
+      const extras = (it.extras || []).map(x => `<details class="after"><summary>${esc(x.rotulo || "Outra versão")}</summary><div class="msg">${esc(x.texto)}</div><div class="actions">${copyBtn(x.texto)}</div></details>`).join("");
+      const text = it.texto ? `${it.texto_rotulo ? `<div class="msg-label">${esc(it.texto_rotulo)}</div>` : ""}<div class="msg">${esc(it.texto)}</div>`
+        : `<div class="msg">Texto não encontrado em <code>${esc(it.arquivo || "rascunhos/linkedin/")}</code>.</div>`;
+      return task(it.id, it.ordem, `<div class="head"><span class="company">${company(it)}</span><span class="pill kind-${esc(it.tipo)}">${esc(it.tipo_rotulo)}</span></div>
+        <div class="who"><b>${esc(it.nome)}</b>${it.cargo ? ` <span>· ${esc(it.cargo)}</span>` : ""}</div>
+        ${text}${extras}
+        <div class="actions">${extLink(it.perfil, "Abrir perfil")}${it.texto ? copyBtn(it.texto) : ""}</div>`);
+    }).join("")}</div>` : nothing;
+
+    // d) E-mails
+    const gmail = p.modo_email !== "arquivo";
+    h += `<h2 class="group" id="p-emails">E-mails <span class="count">${em.length}</span><small>${gmail ? "rascunhos prontos no Gmail" : "rascunhos em rascunhos/email/"}</small></h2>`;
+    h += em.length ? `<div class="list">${em.map((it, i) => task(it.id, i + 1, `<div class="head"><span class="company">${company(it)}</span></div>
+        <div class="line"><span class="meta">Para:</span> <b>${esc(it.para)}</b></div>
+        <div class="line"><span class="meta">Assunto:</span> ${esc(it.assunto)}</div>
+        ${!gmail && it.texto ? `<div class="msg">${esc(it.texto)}</div>` : ""}
+        <div class="actions">${gmail ? extLink(p.gmail_rascunhos, "Abrir Rascunhos do Gmail", "btn primary") : (it.texto ? copyBtn(it.texto) : "")}</div>`)).join("")}</div>` : nothing;
+
+    // e) Decisões suas
+    h += `<h2 class="group" id="p-decisoes">Decisões suas <span class="count">${dec.length}</span><small>vagas em que o robô não se candidatou</small></h2>`;
+    h += dec.length ? `<div class="list">${dec.map((it, i) => task(it.id, i + 1, `<div class="head"><span class="company">${company(it)}</span></div>
+        <div class="line">${esc(cap(it.motivo))}</div>
+        <div class="meta">Fonte: ${esc(it.origem)}</div>
+        <div class="actions">${extLink(it.link, "Abrir a vaga", "btn primary")}${it.relatorio_html && !d.demo ? `<a class="btn" href="${esc(it.relatorio_html)}" data-relatorio>Relatório da empresa</a>` : ""}</div>`)).join("")}</div>` : nothing;
+
+    // f) Enviados hoje: each one can be undone
+    if (MODE === "servidor") {
+      h += `<h2 class="group" id="p-enviados">Enviados hoje <span class="count">${sent.length}</span><small>marcados como Feito hoje</small></h2>`;
+      h += sent.length ? `<div class="list">${sent.map((it, i) => `<article class="task sent" data-id="${esc(it.id)}"><div class="n ok">✓</div><div>
+          <div class="head"><span class="pill kind-mensagem">${esc(KIND[it.tipo] || it.tipo)}</span><span class="company">${it.numero != null ? "#" + esc(it.numero) + " " : ""}${esc(it.empresa || "")}</span></div>
+          <div class="line">${esc(cap(it.descricao))}</div><div class="meta">Registrado em ${esc(br(it.data))}</div></div>
+          <button class="btn" type="button" data-undo="${esc(it.id)}">Desfazer</button></article>`).join("")}</div>`
+        : `<div class="empty">Nada marcado como Feito hoje.</div>`;
+    }
+    h += `</section>`;
+    return h;
+  }
+
+  function bindPending(app) {
+    app.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+      copyText(COPY[+b.getAttribute("data-copy")]).then(ok => {
+        const old = b.textContent; b.textContent = ok ? "Copiado ✓" : "Não copiou: selecione o texto"; b.classList.toggle("copied", ok);
+        setTimeout(() => { b.textContent = old; b.classList.remove("copied"); }, 1600);
+      });
+    }));
+    app.querySelectorAll("[data-done]").forEach(cb => cb.addEventListener("change", () => {
+      const art = cb.closest(".task");
+      if (MODE === "demo") { art.classList.toggle("done", cb.checked); return; }
+      if (!cb.checked) return;
+      art.classList.add("done");
+      act("/api/feito", cb.getAttribute("data-done"), cb, "Marcou como Feito, está registrado.");
+    }));
+    app.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click",
+      () => act("/api/desfazer", b.getAttribute("data-undo"), b, "Desfeito: o item voltou para os pendentes.")));
+    app.querySelectorAll("[data-jump]").forEach(b => b.addEventListener("click", () => {
+      const el = document.getElementById(b.getAttribute("data-jump")); if (el) el.scrollIntoView({ behavior: "smooth" });
+    }));
+  }
+
+  // ---------- render ----------
+  function render(d) {
+    MODE = SRV && !d.demo ? "servidor" : "demo";
+    COPY.length = 0;
+    const p = d.projeto || {}, r = d.rodada;
+    const pct = p.total ? Math.round((p.concluidas / p.total) * 100) : 0;
+    document.title = (d.demo ? "Demo · " : "") + "Painel da prospecção";
+    document.getElementById("headline").innerHTML = `<em>${p.concluidas || 0}</em> de ${p.total || 0} empresas concluídas`;
+    document.getElementById("generated").innerHTML = `Atualizado em ${esc(br(d.gerado_em))} ${esc((d.gerado_em || "").slice(11))}` +
+      (p.data_corte ? ` · envios conferidos desde ${esc(br(p.data_corte))}` : "") + (d.demo ? `<span class="demo-flag">DADOS FICTÍCIOS</span>` : "");
+
+    let html = renderPending(d);
+
+    // Última rodada
+    html += `<section id="rodada" class="fade"><h2>Última rodada ${r ? `<small>${esc(br(r.data))} · ${r.arquivo_html && !d.demo ? `<a href="${esc(r.arquivo_html)}" data-relatorio>${esc(r.arquivo)}</a>` : esc(r.arquivo)}</small>` : ""}</h2>`;
+    if (!r) {
+      html += `<div class="empty">Ainda não há rodada. Rode <code>/next-companies</code>.</div>`;
+    } else {
+      const total = r.empresas.length;
+      const drafts = (r.rascunhos_novos.email || 0) + (r.rascunhos_novos.linkedin || 0);
+      html += `<div class="grid kpis">
+        <div class="card kpi"><div class="label">Empresas</div><div class="value">${total}</div><div class="hint">processadas na última rodada</div></div>
+        <div class="card kpi"><div class="label">Rascunhos novos</div><div class="value accent">${drafts}</div><div class="hint">${r.rascunhos_novos.linkedin} LinkedIn · ${r.rascunhos_novos.email} e-mail</div></div>
+        <div class="card kpi"><div class="label">Candidaturas</div><div class="value">${r.candidaturas}</div><div class="hint">enviadas com confirmação</div></div>
+        <div class="card kpi"><div class="label">Follow-ups</div><div class="value">${(d.followups || []).length}</div><div class="hint">com data marcada</div></div>
+      </div>`;
+      html += `<div class="grid two" style="margin-top:14px">
+        <div class="card"><h3>O que fazer agora</h3>${r.o_que_fazer.length ? `<ol class="todo">${r.o_que_fazer.map(todoItem).join("")}</ol>` : `<div class="empty">Nada pendente na última rodada.</div>`}</div>
+        <div class="card"><h3>Status da última rodada</h3>${Object.keys(r.status).length ? '<div class="chart">' + hbars(Object.entries(r.status).sort((a, b) => b[1] - a[1]).map(([s, n]) => ({ label: label(s), value: n })), { aria: "Status da última rodada", labelW: 170 }) + '</div>' : `<div class="empty">Sem status.</div>`}</div>
+      </div>`;
+      html += `<div class="card" style="margin-top:14px"><h3>Empresas da rodada</h3><div class="scroll-x"><table>
+        <thead><tr><th>#</th><th>Empresa</th><th>Status</th><th class="num">Rascunhos</th></tr></thead><tbody>
+        ${r.empresas.map(c => `<tr><td>${c.numero}</td><td>${esc(c.empresa)}</td><td>${pill(c.status)}</td><td class="num">${c.rascunhos}</td></tr>`).join("")}
+        </tbody></table></div></div>`;
+    }
+    html += `</section>`;
+
+    // Projeto inteiro
+    const funnel = (d.funil || []).map(f => ({ label: label(f.status), value: f.total, muted: f.status === "FALTA_PROCESSAR" }));
+    const types = (d.por_tipo || []).map(t => ({ label: t.tipo, value: t.concluidas, display: `${t.concluidas}/${t.total}`, tip: `${t.tipo}: ${t.concluidas} de ${t.total} concluídas`, max: 0 }));
+    const typeMax = Math.max(1, ...(d.por_tipo || []).map(t => t.total));
+    const rounds = (d.rodadas || []).map(x => ({ date: x.data, value: x.empresas }));
+    html += `<section id="projeto" class="fade"><h2>Projeto inteiro <small>${pct}% concluído</small></h2>
+      <div class="card"><div class="kpi"><div class="label">Progresso</div></div>
+        <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+        <div class="sub">${p.concluidas} concluídas · ${p.faltam} faltam · ${p.total} na planilha</div></div>
+      <div class="grid two" style="margin-top:14px">
+        ${chartCard("Funil por status", hbars(funnel, { aria: "Empresas por status" }), ["Status", "Empresas"], (d.funil || []).map(f => [label(f.status), f.total]))}
+        ${chartCard("Empresas por tipo (concluídas / total)", hbars(types.map(t => Object.assign(t, { max: typeMax })), { aria: "Empresas por tipo", track: true, max: typeMax }), ["Tipo", "Concluídas", "Total"], (d.por_tipo || []).map(t => [t.tipo, t.concluidas, t.total]))}
+      </div>
+      <div style="margin-top:14px">${chartCard("Empresas registradas por dia", columns(rounds, "Empresas registradas por dia"), ["Dia", "Empresas"], rounds.map(x => [br(x.date), x.value]))}</div>
+    </section>`;
+
+    // Responderam
+    const replied = d.responderam || [];
+    html += `<section id="responderam" class="fade"><h2>Responderam <small>${replied.length} nas últimas rodadas</small></h2>
+      ${replied.length ? `<div class="list">${replied.map(x => `<div class="item"><div class="badge">${esc(short(x.rodada))}</div><div>${esc(x.texto)}<div class="meta">visto na conferência da rodada de ${esc(br(x.rodada))}</div></div></div>`).join("")}</div>`
+        : `<div class="empty">Ninguém respondeu ainda. As respostas aparecem aqui quando a rodada confere suas mensagens.</div>`}
+    </section>`;
+
+    // Follow-ups
+    const today = new Date().toISOString().slice(0, 10);
+    const fus = d.followups || [];
+    html += `<section id="followups" class="fade"><h2>Follow-ups com data <small>só se não houver resposta</small></h2>
+      ${fus.length ? `<div class="list">${fus.map(f => { const due = f.data <= today; return `<div class="item"><div class="badge ${due ? "due" : ""}">${esc(short(f.data))}</div><div>${esc(f.quem)}<div class="meta">${due ? "já pode mandar" : "a partir de " + esc(br(f.data))}</div></div></div>`; }).join("")}</div>`
+        : `<div class="empty">Nenhum follow-up marcado.</div>`}
+    </section>`;
+
+    const app = document.getElementById("app");
+    app.innerHTML = html;
+    app.querySelectorAll(".toggle").forEach(b => b.addEventListener("click", () => {
+      const card = b.closest(".card"); card.classList.toggle("show-table");
+      b.textContent = card.classList.contains("show-table") ? "Ver gráfico" : "Ver tabela";
+    }));
+    bindTips(app);
+    bindPending(app);
+    tabs();
+    tour();
+  }
+
+  // ---------- tabs: one section at a time; "Pendentes" opens by default (#pendentes, #rodada, ...) ----------
+  const TABS = ["pendentes", "rodada", "projeto", "responderam", "followups"];
+  function showTab(id, scroll) {
+    if (!TABS.includes(id)) id = TABS[0];
+    TABS.forEach(t => { const s = document.getElementById(t); if (s) s.hidden = t !== id; });
+    document.querySelectorAll("nav.tabs a").forEach(a => {
+      const on = a.getAttribute("href") === "#" + id;
+      a.classList.toggle("on", on);
+      if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    const nav = document.querySelector("nav.tabs");
+    if (scroll && nav && window.scrollY > nav.offsetTop) window.scrollTo({ top: nav.offsetTop, behavior: "instant" });
+  }
+  let tabsBound = false;
+  function tabs() {
+    if (!tabsBound) window.addEventListener("hashchange", () => showTab(location.hash.slice(1), true));
+    tabsBound = true;
+    showTab(location.hash.slice(1), false);
+  }
+
+  // ---------- ?tour=1 cycles through the tabs (used to record the demo GIF) ----------
+  let touring = false;
+  function tour() {
+    if (touring || !/[?&]tour=1/.test(location.search)) return;
+    touring = true;
+    let i = 0;
+    setInterval(() => { i = (i + 1) % TABS.length; showTab(TABS[i], true); }, 2600);
+  }
+
+  // ---------- load ----------
+  function fail(msg) {
+    document.getElementById("headline").textContent = "Painel sem dados";
+    document.getElementById("app").innerHTML = `<div class="empty" style="margin-top:30px">${msg}</div>`;
+  }
+  function start(d) { DATA = d; render(d); heartbeat(); }
+  if (SRV) {
+    api("/data.json").then(start).catch(e => fail(e.encerrado ? ENDED : "Não consegui ler os dados do painel: " + esc(e.message) + "."));
+  } else {  // demo (GitHub Pages): fictitious data, only strikes on screen
+    const src = (new URLSearchParams(location.search).get("data")) || document.querySelector('meta[name="painel-data"]').content;
+    fetch(src, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(start)
+      .catch(() => fail("Não achei os dados do painel."));
+  }
+})();
+</script>
+</body>
+</html>

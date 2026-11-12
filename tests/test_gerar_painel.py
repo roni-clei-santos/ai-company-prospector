@@ -1,7 +1,8 @@
 """Tests for scripts/gerar_painel.py: the follow-up item of "O que fazer agora" (fictitious data only).
 
-Each case checks painel/data.json and the HTML rendered by painel/index.html (via headless Chrome,
-skipped when Chrome is not installed).
+Each case checks painel/data.json and the HTML of the panel served by scripts/servidor_painel.py (on a
+port chosen by the system, in a temporary folder) and rendered by headless Chrome, skipped when Chrome is
+not installed.
 """
 import json
 import os
@@ -88,23 +89,33 @@ def make_project(tmp_path, monkeypatch, round_text):
     return json.loads((tmp_path / "painel" / "data.json").read_text(encoding="utf-8"))
 
 
-def render(tmp_path):
+def dump_panel(root, today=None):
+    """DOM of the panel served by the real server (port 0, temporary project) after its scripts ran."""
+    import threading
+    import servidor_painel
     if not CHROME:
         pytest.skip(NO_CHROME_REASON)
+    srv = servidor_painel.make_server(root, 0, today=today)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
     profile = tempfile.mkdtemp(prefix="chrome-test-")  # own profile: never touches the user's Chrome
     try:
-        out = subprocess.run([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}",
-                              "--no-first-run", "--no-default-browser-check", "--virtual-time-budget=3000",
-                              "--dump-dom", (tmp_path / "painel" / "index.html").as_uri()],
-                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
+        return subprocess.run([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}",
+                               "--no-first-run", "--no-default-browser-check", "--virtual-time-budget=3000",
+                               "--dump-dom", f"http://127.0.0.1:{srv.server_address[1]}/"],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
     except subprocess.TimeoutExpired:
         # Only skip on GitHub Actions AND macOS (both at once); anywhere else the render stays mandatory.
-        # The panel data assertions in each test run before render(), so they always run.
         if os.environ.get("CI") == "true" and sys.platform == "darwin":
             pytest.skip(SKIP_RENDER_REASON)
         raise
     finally:
+        srv.shutdown()
+        srv.server_close()
         shutil.rmtree(profile, ignore_errors=True)
+
+
+def render(tmp_path):
+    out = dump_panel(tmp_path)
     m = re.search(r'<ol class="todo">(.*?)</ol>', out, re.S)
     assert m, "to-do list not rendered"
     return m.group(1)
@@ -147,10 +158,9 @@ def test_followup_label_formats():
 
 def test_opens_browser_unless_no_open(tmp_path, monkeypatch):
     calls = []
-    monkeypatch.setattr(gerar_painel, "open_file_in_browser", lambda uri: calls.append(uri) or True)
     monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda uri: calls.append(uri) or True)
-    monkeypatch.setattr(gerar_painel, "ensure_server", lambda root: None)  # no server: the file opens anyway
+    monkeypatch.setattr(gerar_painel, "ensure_server", lambda root: "http://127.0.0.1:50000/")
     make_project(tmp_path, monkeypatch, WITH_FOLLOWUPS)  # uses --no-open
     assert calls == []
     gerar_painel.main([])
-    assert len(calls) == 1 and calls[0].startswith("file://") and calls[0].endswith("/painel/index.html")
+    assert calls == ["http://127.0.0.1:50000/"]  # only through the server, never the file

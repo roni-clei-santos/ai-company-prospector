@@ -196,7 +196,6 @@ def make_project(tmp_path, monkeypatch, parcial=PARCIAL, nao_contatar=True, roun
     out = tmp_path / "painel"
     payload = json.dumps(data, ensure_ascii=False)
     (out / "data.json").write_text(payload, encoding="utf-8")
-    (out / "data.js").write_text(f"window.PAINEL_DATA = {payload};\n", encoding="utf-8")
     return data
 
 
@@ -302,23 +301,8 @@ def test_empty_project(tmp_path, monkeypatch):
 
 
 def _render(tmp_path):
-    if not CHROME:
-        pytest.skip(NO_CHROME_REASON)
-    import os
-    import subprocess
-    import tempfile
-    profile = tempfile.mkdtemp(prefix="chrome-test-")
-    try:
-        return subprocess.run([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}", "--no-first-run",
-                               "--no-default-browser-check", "--virtual-time-budget=3000", "--dump-dom",
-                               (tmp_path / "painel" / "index.html").as_uri()],
-                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
-    except subprocess.TimeoutExpired:
-        if os.environ.get("CI") == "true" and sys.platform == "darwin":
-            pytest.skip(SKIP_RENDER_REASON)
-        raise
-    finally:
-        shutil.rmtree(profile, ignore_errors=True)
+    from test_gerar_painel import dump_panel
+    return dump_panel(tmp_path, today=TODAY)
 
 
 def test_rendered_tab(tmp_path, monkeypatch):

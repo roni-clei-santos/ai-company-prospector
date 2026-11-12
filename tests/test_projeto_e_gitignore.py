@@ -96,8 +96,8 @@ def test_no_project_found_stops_with_message(tmp_path, monkeypatch, capsys):
 
 
 @pytest.mark.skipif(shutil.which("git") is None or not (REPO / ".git").exists(), reason="sem git ou fora de um repositório")
-@pytest.mark.parametrize("path", ["painel/servidor.js", "painel/data.js", "painel/data.json",
-                                  "painel/relatorios/001-loja-exemplo-1.html", "controle/.painel-token"])
+@pytest.mark.parametrize("path", ["painel/data.json", "painel/relatorios/001-loja-exemplo-1.html",
+                                  "controle/.painel-servidor.json"])
 def test_personal_panel_files_are_gitignored(path):
     out = subprocess.run(["git", "check-ignore", "-q", "--no-index", path], cwd=REPO)
     assert out.returncode == 0, f"{path} não está no .gitignore"

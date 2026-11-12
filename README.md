@@ -152,7 +152,7 @@ O `install.ps1` confere o Python (`py -3` ou `python`), instala o RTK com o `win
 
 Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na pasta (`claude`) e rode **`/build-company-list`** para receber a planilha (não precisa de LinkedIn). Para o modo "Planilha + robô": rode `/chrome`, entre no LinkedIn nesse Chrome e rode **`/next-companies`** a cada rodada. Entre uma rodada e outra, **`/painel`** abre o painel na aba Pendentes, sem processar empresa nenhuma e sem abrir o LinkedIn ([guia do painel](docs/guia/06-painel.md)).
 
-**Como abrir o painel:** Dê duplo clique em painel/index.html, ou rode /painel. Se o painel for aberto direto e a gravação estiver desligada, o clique fica guardado e é salvo sozinho na próxima vez que o /painel ou o robô rodar.
+**Como abrir o painel:** rode /painel no Claude Code. Ele também abre sozinho no fim de cada rodada. O painel roda só no seu computador e desliga quando você fecha a aba.
 
 ## Requisitos
 
@@ -237,7 +237,7 @@ Ele usa a sua própria conta do Claude Code, e o gasto depende do seu plano e de
 <details>
 <summary><b>Meus dados vão para algum lugar?</b></summary>
 
-Seu perfil, planilhas, rascunhos, relatórios e currículos ficam só no seu computador (estão no `.gitignore`). Nada sai do seu computador. O botão Feito grava no projeto por um programinha que roda só no seu computador, só enquanto o painel está em uso. O que o Claude Code lê para trabalhar passa pela Anthropic, como em qualquer uso do Claude Code, e a navegação acontece no seu próprio Chrome.
+Seu perfil, planilhas, rascunhos, relatórios e currículos ficam só no seu computador (estão no `.gitignore`). Nada sai do seu computador: o painel roda só no seu computador e desliga quando você fecha a aba. O que o Claude Code lê para trabalhar passa pela Anthropic, como em qualquer uso do Claude Code, e a navegação acontece no seu próprio Chrome.
 </details>
 
 <details>
@@ -250,7 +250,7 @@ Instalador e testes automáticos: ✅. O `install.ps1` roda no PowerShell 5.1 e 
 
 **O que o robô guarda.** Nome, cargo, empresa, link do perfil e, quando houver, o e-mail profissional de recrutadores e contatos de RH. Pela LGPD, isso é dado pessoal, mesmo quando vem de um perfil público.
 
-**Onde fica.** Só no computador de quem usa, nas pastas e arquivos que o `.gitignore` deixa fora do git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, as planilhas `.xlsx`, os `relatorio-*.md` e os arquivos gerados do painel (`painel/data.json`, `painel/data.js`, `painel/servidor.js` e `painel/relatorios/`). Nada sai do seu computador. O botão Feito grava no projeto por um programinha que roda só no seu computador, só enquanto o painel está em uso.
+**Onde fica.** Só no computador de quem usa, nas pastas e arquivos que o `.gitignore` deixa fora do git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, as planilhas `.xlsx`, os `relatorio-*.md` e os arquivos gerados do painel (`painel/data.json` e `painel/relatorios/`). Nada sai do seu computador: o painel roda só no seu computador e desliga quando você fecha a aba.
 
 **Quem é responsável.** Quem usa o robô passa a ser o responsável por esses dados.
 

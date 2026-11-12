@@ -20,7 +20,7 @@ Se nenhuma existir, PARE com: "Não achei o projeto. Rode o instalador na pasta 
 
 ## Passo 2: abrir o painel
 
-Rode `python3 "<pasta do projeto>/scripts/gerar_painel.py"` (no Windows, `py -3` no lugar de `python3`). O script regenera `painel/data.json`, `painel/data.js` e os relatórios em `painel/relatorios/`. Também liga o servidor local, se estiver parado, e abre `painel/index.html` no navegador padrão, na aba Pendentes. O servidor fica em http://127.0.0.1:47321, só neste computador, e para sozinho 30 minutos depois do último uso.
+Rode `python3 "<pasta do projeto>/scripts/gerar_painel.py"` (no Windows, `py -3` no lugar de `python3`). O script regenera `painel/data.json` e os relatórios em `painel/relatorios/`. Também liga o servidor local do painel (ou reaproveita o que já está ligado) e abre o painel no navegador padrão, na aba Pendentes. O servidor fica em http://127.0.0.1, só neste computador, e desliga sozinho quando a aba do painel é fechada.
 
 Se o script responder "Não achei o projeto. Rode o instalador na pasta do projeto.", repasse a frase e pare.
 
@@ -29,4 +29,4 @@ Se o script responder "Não achei o projeto. Rode o instalador na pasta do proje
 Responda só com:
 - a linha de totais da aba Pendentes, lida em `painel/data.json > pendentes`: "X mensagens de LinkedIn, Y e-mails, Z follow-ups vencidos e W decisões suas." (follow-ups vencidos são os de `followups` com `data` até hoje);
 - "Painel aberto (aba Pendentes). Marcou como Feito, está registrado."
-- se o script avisou que não conseguiu ligar o servidor, repita o aviso dele.
+- se o script avisou que não conseguiu ligar o painel, repita o aviso dele.

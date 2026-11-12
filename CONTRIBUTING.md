@@ -6,7 +6,7 @@ Obrigado por querer ajudar! Este projeto é pequeno de propósito: Markdown para
 
 1. Rode os testes: `python3 -m pytest` (todos têm que passar).
 2. **Nunca** inclua dados pessoais: nada de `perfil.local.md`, `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, planilhas `.xlsx` reais, PDFs ou prints do LinkedIn, do Gmail ou de qualquer tela com dado real. Exemplos e testes usam só dados fictícios ("Alex Exemplo", "Loja Exemplo 1", `example.com`).
-3. Se mexer no `painel/index.html` ou no `painel/demo-data.json`, rode `python3 scripts/gerar_painel.py --demo` para atualizar a demo em `docs/demo/`.
+3. Se mexer no `scripts/painel_template.html` (a página do painel) ou no `painel/demo-data.json`, rode `python3 scripts/gerar_painel.py --demo` para atualizar a demo em `docs/demo/`.
 4. Comentários de código em inglês; documentação em português (`README.md`, `docs/guia/`) e inglês (`README.en.md`).
 
 ## Regras que não mudam

@@ -1,9 +1,9 @@
 # Laboratório de navegadores (só no GitHub Actions)
 
-Testa o **painel real** (`painel/index.html` + `scripts/servidor_painel.py`) com um projeto fictício (`projeto_lab.py`), em 11 navegadores com janela: Safari, Chrome, Edge, Firefox e Brave no macOS, Windows e Ubuntu.
-- **A, arquivo com o servidor ligado:** Feito grava, Desfazer volta e Relatório da empresa abre.
-- **B, arquivo com o servidor desligado:** o Feito mostra "Vou salvar…"; depois de ligar o servidor e recarregar, o clique fica salvo em até 15 s.
-- **C, endereço http:** Feito, Desfazer e Relatório da empresa. **D, auditoria:** todos os botões e links de `inventario.md`.
-- **Status:** qualquer ❌ reprova o CI. AMBIENTE quer dizer que o teste não conseguiu rodar; ele tenta mais uma vez e, se continuar, vira só aviso no resumo.
-- **Safari:** o WebDriver dele não abre `file://`, então A e B abrem o arquivo com `open -a Safari` e clicam via AppleScript.
-- **Modos:** RÁPIDO (padrão, em todo push: Ubuntu + Chrome sem janela, menos de 4 min) e COMPLETO (`gh workflow run browser-lab.yml -f modo=completo`). Se o servidor não responder em 10 s, o job para na hora e mostra a saída dele. O resultado fica no artifact `browser-lab-resumo`. Nunca rode no seu computador.
+Testa o **painel real** com um projeto fictício (`projeto_lab.py`). O painel é aberto como o `/painel` abre (`painel_lab.py` roda o `gerar_painel.py` e só troca o navegador do sistema pelo do teste).
+- **A:** o `painel/index.html` aberto direto mostra só a instrução do `/painel`, sem checkbox. **C:** Feito grava, Desfazer volta e Relatório da empresa abre.
+- **D:** auditoria de todos os botões e links de `inventario.md`. **E:** 70 s sem mexer, a tela não se redesenha sozinha.
+- **F:** com o servidor encerrado e a página aberta, o Feito mostra "O painel foi encerrado…" uma vez só, e nada se redesenha em 40 s. **G:** ao fechar a aba, o servidor termina em até 20 s e apaga o `controle/.painel-servidor.json`.
+- **Status:** qualquer ❌ reprova o CI. AMBIENTE quer dizer que o teste não conseguiu rodar; ele tenta mais uma vez e, se continuar, vira aviso no resumo.
+- **Safari:** o WebDriver dele não abre `file://`, então o A usa `open -a Safari` e AppleScript.
+- **Modos:** RÁPIDO (padrão, em todo push: Ubuntu + Chrome sem janela) e COMPLETO (`gh workflow run browser-lab.yml -f modo=completo`, 11 navegadores). Se o painel não abrir em 10 s, o job para na hora e mostra a saída do servidor. Nunca rode no seu computador.

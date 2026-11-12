@@ -1,17 +1,19 @@
 """Tests for the local panel server and the "Feito" button (fictitious data only).
 
-POST /api/feito records the item as ENVIADO today in every place the robot records a send
-(progresso.json, relatorio-parcial.md, company report, draft file, historico-contatos.md and
-relatorio-final.xlsx); POST /api/desfazer reverts exactly those writes. Runs on macOS, Linux and
-Windows (standard library server on 127.0.0.1; the Chrome renders are skipped without Chrome).
+Every test starts the server on a port chosen by the system (port 0) in a temporary folder: never a fixed
+port, never the files of a real project. POST /api/feito records the item as ENVIADO today in every place
+the robot records a send (progresso.json, relatorio-parcial.md, company report, draft file,
+historico-contatos.md and relatorio-final.xlsx); POST /api/desfazer reverts exactly those writes.
 """
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -25,7 +27,7 @@ sys.path.insert(0, str(REPO / "tests"))
 import gerar_painel  # noqa: E402
 import registrar  # noqa: E402
 import servidor_painel  # noqa: E402
-from test_gerar_painel import CHROME, NO_CHROME_REASON, SKIP_RENDER_REASON  # noqa: E402
+from test_gerar_painel import CHROME, NO_CHROME_REASON, SKIP_RENDER_REASON, dump_panel  # noqa: E402
 from test_pendentes import TODAY, make_project  # noqa: E402
 
 GERENTE = "li:linkedin.com/in/gerente-exemplo"
@@ -33,6 +35,8 @@ EMAIL3 = "em:3:socio@agencia3.example.com"
 FOLLOWUP2 = "fu:2:2026-11-12"
 REPORT1 = "relatorios/001-loja-exemplo-1.md"
 CONTACTS = "controle/historico-contatos.md"
+STATE = "controle/.painel-servidor.json"
+FRASE = "Este painel abre pelo comando /painel no Claude Code, ou sozinho no fim de cada rodada do robô."
 
 
 @pytest.fixture
@@ -47,9 +51,8 @@ def server(tmp_path, monkeypatch):
     ws.cell(row=1, column=8, value="Pendências do candidato")
     ws.cell(row=2, column=7, value="LinkedIn: 1 nota de convite.")
     wb.save(tmp_path / "relatorio-final.xlsx")
-    srv = servidor_painel.make_server(tmp_path, today=TODAY)
-    thread = threading.Thread(target=srv.serve_forever, daemon=True)
-    thread.start()
+    srv = servidor_painel.make_server(tmp_path, 0, today=TODAY)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
     srv.root = tmp_path
     srv.base = f"http://127.0.0.1:{srv.server_address[1]}"
     yield srv
@@ -58,12 +61,12 @@ def server(tmp_path, monkeypatch):
 
 
 def call(srv, path, body=None, headers=None, token=True, origin=True):
+    """Like the panel page: same Origin, token in the header (GET /data.json and every POST)."""
     h = {"Content-Type": "application/json"}
-    if body is not None:
-        if token:
-            h["X-Painel-Token"] = srv.token
-        if origin:
-            h["Origin"] = srv.base
+    if token:
+        h["X-Painel-Token"] = srv.token
+    if body is not None and origin:
+        h["Origin"] = srv.base
     h.update(headers or {})
     data = json.dumps(body).encode("utf-8") if body is not None else None
     req = urllib.request.Request(srv.base + path, data=data, headers=h, method="POST" if body is not None else "GET")
@@ -82,34 +85,6 @@ def snapshot(root):
     ws = openpyxl.load_workbook(root / "relatorio-final.xlsx")["Empresas"]
     texts["xlsx"] = [[c.value for c in row] for row in ws.iter_rows()]
     return texts
-
-
-def test_serves_panel_with_persistent_token(server):
-    code, js = call(server, "/data.js")
-    assert code == 200 and js.startswith("window.PAINEL_DATA = ") and server.token not in js
-    code, js = call(server, "/servidor.js")
-    assert code == 200 and js == f'window.PAINEL_SERVIDOR = {{"url": "{server.base}", "token": "{server.token}"}};\n'
-    assert (server.root / "controle" / ".painel-token").read_text(encoding="utf-8").strip() == server.token
-    assert re.fullmatch(r"[0-9a-f]{64}", server.token)
-    code, html = call(server, "/index.html")
-    assert code == 200 and "Pendentes" in html
-    assert call(server, "/api/estado")[0] == 403  # /api/* needs the token
-    code, body = call(server, "/api/estado", headers={"X-Painel-Token": server.token})
-    assert code == 200 and Path(json.loads(body)["raiz"]).resolve() == server.root.resolve()
-
-
-def test_only_this_computer_and_this_page(server):
-    assert call(server, "/data.js", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
-    assert call(server, "/data.js", headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate"})[0] == 403
-    assert call(server, "/index.html", headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate"})[0] == 200
-    assert call(server, "/index.html", headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "no-cors"})[0] == 403
-    assert call(server, "/data.json", headers={"Host": "evil.example.com"})[0] == 403
-    assert call(server, "/servidor.js", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403  # the token never leaks
-    assert call(server, "/api/feito", {"id": GERENTE}, token=False)[0] == 403
-    assert call(server, "/api/feito", {"id": GERENTE}, headers={"X-Painel-Token": "0" * 64})[0] == 403
-    assert call(server, "/api/feito", {"id": GERENTE}, headers={"Origin": "https://example.com"})[0] == 403
-    assert server.server_address[0] == "127.0.0.1"
-    assert not (server.root / "controle" / "painel-feitos.json").exists()  # nothing was recorded
 
 
 def test_feito_linkedin_records_everywhere_and_undo_reverts(server):
@@ -198,35 +173,6 @@ def _raw(srv, method, path, headers=None, body=None):
     return out
 
 
-def test_cors_for_the_page_opened_from_disk(server):
-    """file:// pages send Origin "null": allowed with the token, never without it; other sites never."""
-    code, h, _ = _raw(server, "OPTIONS", "/api/feito", {"Origin": "null", "Access-Control-Request-Method": "POST",
-                                                        "Access-Control-Request-Headers": "content-type,x-painel-token"})
-    assert code == 204
-    assert h["access-control-allow-origin"] == "null"
-    assert h["access-control-allow-methods"] == "GET, POST, OPTIONS"
-    assert h["access-control-allow-headers"] == "Content-Type, X-Painel-Token"
-    assert h["access-control-allow-private-network"] == "true" and h["access-control-max-age"] == "0"
-    json_h = {"Origin": "null", "Content-Type": "application/json", "Sec-Fetch-Site": "cross-site"}
-    code, h, body = _raw(server, "POST", "/api/feito", dict(json_h, **{"X-Painel-Token": server.token}), {"id": GERENTE})
-    assert code == 200 and h["access-control-allow-origin"] == "null" and json.loads(body)["feito"] == GERENTE
-    code, h, _ = _raw(server, "GET", "/data.json", {"Origin": "null", "Sec-Fetch-Site": "cross-site", "X-Painel-Token": server.token})
-    assert code == 200 and h["access-control-allow-origin"] == "null"
-    # wrong or missing token: refused, nothing written
-    for headers in ({"X-Painel-Token": "f" * 64}, {}):
-        code, h, _ = _raw(server, "POST", "/api/desfazer", dict(json_h, **headers), {"id": GERENTE})
-        assert code == 403
-        assert _raw(server, "GET", "/data.json", dict({"Origin": "null", "Sec-Fetch-Site": "cross-site"}, **headers))[0] == 403
-    assert registrar.done_ids(server.root) == {GERENTE}
-    # any other site: refused even with the token, and no CORS header for it
-    for origin in ("https://example.com", "http://127.0.0.1:1"):
-        code, h, _ = _raw(server, "OPTIONS", "/api/feito", {"Origin": origin, "Access-Control-Request-Method": "POST"})
-        assert code == 403 and "access-control-allow-origin" not in h
-        code, h, _ = _raw(server, "POST", "/api/desfazer", dict(json_h, Origin=origin, **{"X-Painel-Token": server.token}), {"id": GERENTE})
-        assert code == 403 and "access-control-allow-origin" not in h
-    assert registrar.done_ids(server.root) == {GERENTE}
-
-
 def test_reports_only_from_painel_relatorios(server):
     reports = server.root / "painel" / "relatorios"
     reports.mkdir(parents=True, exist_ok=True)
@@ -250,65 +196,139 @@ def test_marked_item_never_comes_back(server):
     assert gerar_painel.build(server.root, today="2026-11-13")["pendentes"]["enviados_hoje"] == []  # only today's
 
 
-def test_opens_the_file_with_the_server_on(tmp_path, monkeypatch):
-    """/painel opens painel/index.html (the same page as a double click) after starting the server."""
-    make_project(tmp_path, monkeypatch)
-    in_browser, fallback, started = [], [], []
-    monkeypatch.setattr(gerar_painel, "open_file_in_browser", lambda uri: in_browser.append(uri) or True)
-    monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda uri: fallback.append(uri) or True)
-    monkeypatch.setattr(gerar_painel, "ensure_server", lambda root: started.append(root) or "http://127.0.0.1:47321/index.html")
-    gerar_painel.main([])
-    gerar_painel.main(["--arquivo"])
-    assert len(started) == 1 and fallback == []
-    assert all(u.startswith("file://") and u.endswith("/painel/index.html") for u in in_browser) and len(in_browser) == 2
-    assert (tmp_path / "painel" / "servidor.js").read_text(encoding="utf-8").startswith('window.PAINEL_SERVIDOR = {"url": "http://127.0.0.1:47321"')
-    # no browser for file:// pages (unknown default browser): the server address is opened instead
-    monkeypatch.setattr(gerar_painel, "open_file_in_browser", lambda uri: False)
-    gerar_painel.main([])
-    assert fallback == ["http://127.0.0.1:47321/index.html"]
+def test_serves_the_panel_with_this_runs_token(server):
+    code, html = call(server, "/", token=False)
+    assert code == 200 and "Pendentes" in html and f'token: "{server.token}"' in html and "__PAINEL_TOKEN__" not in html
+    assert call(server, "/data.json")[0] == 200
+    assert call(server, "/data.json", token=False)[0] == 403
+    code, body = call(server, "/api/estado", token=False)
+    assert code == 200 and json.loads(body)["pid"] == os.getpid()
+    assert server.server_address[0] == "127.0.0.1"
+    other = servidor_painel.make_server(server.root, 0)
+    assert other.token != server.token  # a new token on every run, never written to a file
+    other.server_close()
+    assert not (server.root / "controle" / ".painel-token").exists() and not (server.root / "painel" / "servidor.js").exists()
 
 
-def test_ensure_server_starts_and_reuses(tmp_path, monkeypatch):
-    make_project(tmp_path, monkeypatch)
-    url = gerar_painel.ensure_server(tmp_path)
+def test_other_origin_is_refused(server):
+    """Only the panel's own address: any other Origin (another site, a file:// page, another port) gets 403."""
+    for origin in ("https://example.com", "null", "http://localhost:" + str(server.server_address[1]),
+                   "http://127.0.0.1:1"):
+        assert call(server, "/api/feito", {"id": GERENTE}, headers={"Origin": origin})[0] == 403, origin
+        assert call(server, "/data.json", headers={"Origin": origin})[0] == 403, origin
+        code, h, _ = _raw(server, "OPTIONS", "/api/feito", {"Origin": origin, "Access-Control-Request-Method": "POST"})
+        assert code != 204 and "access-control-allow-origin" not in h
+    assert call(server, "/api/feito", {"id": GERENTE}, origin=False)[0] == 403        # POST without Origin
+    assert call(server, "/api/feito", {"id": GERENTE}, token=False)[0] == 403
+    assert call(server, "/data.json", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403
+    assert call(server, "/", token=False, headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "no-cors"})[0] == 403
+    assert call(server, "/", token=False, headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate"})[0] == 200
+    assert call(server, "/data.json", headers={"Host": "evil.example.com"})[0] == 403
+    assert not (server.root / "controle" / "painel-feitos.json").exists()  # nothing was recorded
+
+
+def _start(root, **env):
+    """The real command, in the background, as gerar_painel.py starts it."""
+    log = open(root / "srv.log", "wb")
+    proc = subprocess.Popen([sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(root)],
+                            cwd=str(root), stdout=log, stderr=log, env=dict(os.environ, **env))
+    proc.log = log
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        if gerar_painel.panel_url(root):
+            return proc
+        time.sleep(0.1)
+    proc.kill()
+    log.close()
+    raise AssertionError((root / "srv.log").read_text(errors="replace"))
+
+
+def _token(url):
+    with urllib.request.urlopen(url, timeout=5) as r:
+        return re.search(r'token: "([^"]+)"', r.read().decode("utf-8")).group(1)
+
+
+def _post(url, body, token):
+    origin = url.rstrip("/")
+    req = urllib.request.Request(origin + "/api/" + body.pop("_rota"), data=json.dumps(dict(body, token=token)).encode(),
+                                 headers={"Content-Type": "application/json", "Origin": origin}, method="POST")
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return r.status
+
+
+def _ends(proc, root, secs):
     try:
-        log = tmp_path / "controle" / ".painel-servidor.log"
-        assert url and re.match(r"^http://127\.0\.0\.1:473(2\d|30)/index\.html$", url), log.read_text(errors="replace") if log.exists() else "sem log"
-        assert gerar_painel.ensure_server(tmp_path) == url  # reused, not a second server
-        token = (tmp_path / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
-        req = urllib.request.Request(url.replace("index.html", "api/estado"), headers={"X-Painel-Token": token})
-        with urllib.request.urlopen(req, timeout=5) as r:
-            assert Path(json.loads(r.read().decode("utf-8"))["raiz"]).resolve() == tmp_path.resolve()
-        port = url.split(":")[2].split("/")[0]
-        assert f'"url": "http://127.0.0.1:{port}", "token": "{token}"' in (tmp_path / "painel" / "servidor.js").read_text(encoding="utf-8")
+        proc.wait(timeout=secs)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        return False
     finally:
-        _stop_detached(tmp_path)
+        proc.log.close()
+    return not (root / STATE).exists()
 
 
-def _stop_detached(root):
-    path = root / "controle" / ".painel-servidor.json"
-    if not path.exists():
-        return
-    state = json.loads(path.read_text(encoding="utf-8"))
-    port = state["porta"]
-    if sys.platform == "win32":
-        subprocess.run(["powershell", "-NoProfile", "-Command",
-                        f"Get-NetTCPConnection -LocalPort {port} -State Listen | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force }}"],
-                       capture_output=True)
-    else:
-        subprocess.run(["pkill", "-f", f"servidor_painel.py --raiz {root}"], capture_output=True)
-    (root / "controle" / ".painel-servidor.json").unlink(missing_ok=True)
+def test_server_starts_fast_and_records_its_state(tmp_path, monkeypatch):
+    make_project(tmp_path, monkeypatch)
+    t0 = time.time()
+    proc = _start(tmp_path)
+    try:
+        assert time.time() - t0 < 10
+        state = json.loads((tmp_path / STATE).read_text(encoding="utf-8"))
+        assert set(state) == {"pid", "porta", "iniciado_em"} and state["pid"] == proc.pid
+    finally:
+        proc.terminate()
+        assert _ends(proc, tmp_path, 10)
+
+
+def test_stops_when_the_tab_is_closed(tmp_path, monkeypatch):
+    """pagehide -> sendBeacon('/api/fechou'): the server stops within 20 s and deletes its state file."""
+    make_project(tmp_path, monkeypatch)
+    proc = _start(tmp_path)
+    url = gerar_painel.panel_url(tmp_path)
+    token = _token(url)
+    assert _post(url, {"_rota": "estado", "pagina": "aba1"}, token) == 200
+    t0 = time.time()
+    assert _post(url, {"_rota": "fechou", "pagina": "aba1"}, token) == 200
+    assert _ends(proc, tmp_path, 20), (tmp_path / "srv.log").read_text(errors="replace")
+    assert time.time() - t0 <= 20
+    assert gerar_painel.panel_url(tmp_path) is None
+
+
+def test_stops_without_heartbeat(tmp_path, monkeypatch):
+    make_project(tmp_path, monkeypatch)
+    proc = _start(tmp_path, PAINEL_SEM_BATIMENTO_S="2")  # 3 minutes in real use
+    assert _ends(proc, tmp_path, 15), (tmp_path / "srv.log").read_text(errors="replace")
+
+
+def test_gerar_painel_reuses_the_running_server(tmp_path, monkeypatch):
+    """A second /painel opens the same server: never two servers for the same project."""
+    make_project(tmp_path, monkeypatch)
+    opened = []
+    monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda url: opened.append(url) or True)
+    gerar_painel.main([])
+    first = json.loads((tmp_path / STATE).read_text(encoding="utf-8"))
+    try:
+        gerar_painel.main([])
+        assert json.loads((tmp_path / STATE).read_text(encoding="utf-8")) == first
+        assert opened == [f"http://127.0.0.1:{first['porta']}/"] * 2
+    finally:
+        try:
+            os.kill(first["pid"], 15 if os.name != "nt" else 9)
+        except OSError:
+            pass
+        deadline = time.time() + 10
+        while time.time() < deadline and gerar_painel.panel_state(tmp_path):
+            time.sleep(0.2)
 
 
 def _dump(url):
     if not CHROME:
         pytest.skip(NO_CHROME_REASON)
-    import os
     profile = tempfile.mkdtemp(prefix="chrome-test-")
     try:
         out = subprocess.run([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}", "--no-first-run",
                               "--no-default-browser-check", "--virtual-time-budget=3000", "--dump-dom", url],
-                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
         return re.sub(r"<script\b.*?</script>", "", out, flags=re.S)  # only the rendered page, not the JS source
     except subprocess.TimeoutExpired:
         if os.environ.get("CI") == "true" and sys.platform == "darwin":
@@ -318,23 +338,24 @@ def _dump(url):
         shutil.rmtree(profile, ignore_errors=True)
 
 
-def test_render_through_server(server):
-    html = _dump(server.base + "/index.html")
+def test_file_page_has_no_checkbox():
+    """painel/index.html opened straight from disk: only the instruction, no data and no checkbox."""
+    html = (REPO / "painel" / "index.html").read_text(encoding="utf-8")
+    assert "<input" not in html and "<script" not in html and "data.json" not in html
+    assert FRASE in re.sub(r"<[^>]+>", "", html)
+    shown = re.sub(r"<[^>]+>", "", _dump((REPO / "painel" / "index.html").as_uri()))
+    assert FRASE in shown and "checkbox" not in _dump((REPO / "painel" / "index.html").as_uri())
+
+
+def test_render_through_server(tmp_path, monkeypatch):
+    make_project(tmp_path, monkeypatch)
+    html = dump_panel(tmp_path, today=TODAY)
     sec = re.search(r'<section id="pendentes".*?</section>', html, re.S).group(0)
     assert "Enviados hoje" in sec and " disabled" not in sec and sec.count('data-done="') == 13
 
 
-def test_render_from_file_feito_enabled(tmp_path, monkeypatch):
-    """Opened straight from disk, even with no server: every "Feito" works (the click is queued)."""
-    make_project(tmp_path, monkeypatch)
-    html = _dump((tmp_path / "painel" / "index.html").as_uri())
-    sec = re.search(r'<section id="pendentes".*?</section>', html, re.S).group(0)
-    assert sec.count('data-done="') == 13 and " disabled" not in sec
-    assert "Abra pelo /painel" not in sec and "Enviados hoje" in sec
-
-
 def test_render_demo_only_strikes(tmp_path):
-    """GitHub Pages has no server: the demo is served over http here too (file:// cannot fetch the JSON)."""
+    """GitHub Pages has no server: the demo fetches its fictitious JSON and the "Feito" only strikes."""
     import functools
     import http.server
     shutil.copytree(REPO / "docs" / "demo", tmp_path / "demo")
@@ -353,37 +374,10 @@ def test_render_demo_only_strikes(tmp_path):
 
 
 def test_footer_author_links():
-    for path in (REPO / "painel" / "index.html", REPO / "docs" / "demo" / "index.html"):
+    for path in (REPO / "painel" / "index.html", REPO / "scripts" / "painel_template.html", REPO / "docs" / "demo" / "index.html"):
         html = path.read_text(encoding="utf-8")
         foot = re.search(r"<footer>.*?</footer>", html, re.S).group(0)
         assert "Feito por Roni Clei Santos" in foot
         assert 'href="https://www.linkedin.com/in/roni-clei-santos/" target="_blank" rel="noopener">LinkedIn</a>' in foot
         assert 'href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">GitHub</a>' in foot
         assert 'href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">Dar uma estrela no projeto</a>' in foot
-
-
-def test_server_starts_fast_in_a_temp_folder(tmp_path, monkeypatch):
-    """The real command (scripts/servidor_painel.py) answers /api/estado within 10 s, in a temporary project."""
-    import time
-    make_project(tmp_path, monkeypatch)
-    log = open(tmp_path / "srv.log", "wb")
-    proc = subprocess.Popen([sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(tmp_path)],
-                            cwd=str(tmp_path), stdout=log, stderr=log)
-    try:
-        t0, code = time.time(), None
-        while time.time() - t0 < 10 and code is None:
-            try:
-                port = json.loads((tmp_path / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))["porta"]
-                token = (tmp_path / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
-                req = urllib.request.Request(f"http://127.0.0.1:{port}/api/estado", headers={"X-Painel-Token": token})
-                with urllib.request.urlopen(req, timeout=2) as r:
-                    code = r.status
-            except (OSError, ValueError, KeyError):
-                time.sleep(0.2)
-        log.flush()
-        assert code == 200, (tmp_path / "srv.log").read_text(errors="replace")
-        assert 47321 <= port <= 47330
-    finally:
-        proc.terminate()
-        proc.wait(timeout=10)
-        log.close()

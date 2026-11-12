@@ -13,7 +13,8 @@ COMPLETO = {"macos": ["safari", "chrome", "edge", "firefox", "brave"],
 RAPIDO = {"ubuntu": ["chrome"]}
 NOMES = {"safari": "Safari", "chrome": "Chrome", "edge": "Edge", "firefox": "Firefox", "brave": "Brave"}
 SOS = {"macos": "macOS", "windows": "Windows", "ubuntu": "Ubuntu"}
-COLUNAS = [("A", "A arquivo+servidor"), ("B", "B arquivo sem servidor (fila)"), ("C", "C http"), ("D", "D auditoria")]
+COLUNAS = [("A", "A arquivo direto"), ("C", "C /painel"), ("D", "D auditoria"), ("E", "E sem redesenho"),
+           ("F", "F servidor encerrado"), ("G", "G fechar a aba")]
 
 
 def short(text, words=8):

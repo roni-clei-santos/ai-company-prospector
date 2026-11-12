@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Browser lab: the REAL panel (painel/index.html + scripts/servidor_painel.py) over a fictitious project,
-in real headed browsers (Selenium 4). Runs ONLY in GitHub Actions (.github/workflows/browser-lab.yml).
+"""Browser lab: the REAL panel (scripts/servidor_painel.py, opened by scripts/gerar_painel.py) over a
+fictitious project, in real browsers (Selenium 4). Runs ONLY in GitHub Actions (.github/workflows/browser-lab.yml).
 
-Scenarios (each one in a fresh project and, where the browser allows it, a fresh profile):
-  A  file:// with the server ON:  Feito records, Desfazer reverts, "Relatório da empresa" opens
-  B  file:// with the server OFF: Feito shows "Vou salvar..."; server on + reload -> recorded in <= 15 s
-  C  http://127.0.0.1:          Feito, Desfazer and "Relatório da empresa"
-  D  audit of every clickable element of tests/browser_lab/inventario.md (http)
-Safari: its WebDriver does not open file:// pages, so A and B open the page with `open -a Safari` and
-drive it with AppleScript ("do JavaScript"); C and D use safaridriver.
+Scenarios (each one in a fresh project; where the browser allows it, a fresh profile):
+  A  painel/index.html opened straight from disk: only the instruction to use /painel, no checkbox
+  C  opened by gerar_painel.py: Feito records, Desfazer reverts, "Relatório da empresa" opens
+  D  audit of every clickable element of tests/browser_lab/inventario.md
+  E  no redraw by itself: a sentinel attribute on the content survives 70 s without interaction
+  F  server killed with the page open: Feito shows "O painel foi encerrado..." once; 40 s later the
+     sentinel is still there and the message appears only once
+  G  closing the tab: within 20 s the server process ended and controle/.painel-servidor.json is gone
+Safari: its WebDriver does not open file:// pages, so A opens the file with `open -a Safari` and reads it
+with AppleScript ("do JavaScript"); the other scenarios use safaridriver.
 
 Status: "ok", "falha" (the browser/panel failed) or "ambiente" (the test could not run). An "ambiente"
 scenario runs once more; if it persists it is a warning. Exit code 1 if any scenario failed or the lab
-itself broke, else 0. Writes <out>/results.json and screenshots <so>-<navegador>-<cenario>.png.
-Usage: python tests/browser_lab/run_lab.py --so macos --browsers safari,chrome,edge,firefox,brave --out results
+itself broke, else 0. If the server does not answer within 10 s, the job stops at once with its output.
+Usage: python tests/browser_lab/run_lab.py --modo completo --so macos --browsers safari,chrome,edge,firefox,brave --out results
 """
 import argparse
 import json
@@ -21,6 +24,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -42,13 +46,15 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO / "scripts"))
 import projeto_lab  # noqa: E402
+from common import panel_state  # noqa: E402
 
 SYSTEM = platform.system()  # Darwin / Windows / Linux
-SCENARIOS = ("A", "B", "C", "D")
-STEP = 15            # seconds: the longest wait of any step (page, server, Feito, Desfazer)
+SCENARIOS = ("A", "C", "D", "E", "F", "G")
+STEP = 15            # seconds: the longest wait of a step (page, Feito, Desfazer)
 SERVER_WAIT = 10     # seconds for the server to answer /api/estado; otherwise the whole job stops
 HEADLESS = False     # --headless (quick mode only)
-QUEUE_KEY = "painel-fila-v1"
+FRASE = "Este painel abre pelo comando /painel no Claude Code, ou sozinho no fim de cada rodada do robô."
+ENDED = "O painel foi encerrado. Rode /painel para abrir de novo."
 
 
 class Ambiente(Exception):
@@ -60,7 +66,7 @@ class Falha(Exception):
 
 
 class ServidorNaoSubiu(Exception):
-    """scripts/servidor_painel.py did not answer: stop the whole job at once (with its full output)."""
+    """The panel server did not answer: stop the whole job at once (with its full output)."""
 
 
 def first_line(e):
@@ -82,61 +88,49 @@ def wait(fn, secs, step=0.4):
     return last
 
 
-# ---------------------------------------------------------------- fictitious project + real server
+def kill(pid):
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
+    else:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------- fictitious project + the real /painel
 class Projeto:
     def __init__(self, tmp_root, nome):
         self.root = Path(tempfile.mkdtemp(prefix=f"painel-{nome}-", dir=tmp_root))
         projeto_lab.criar(self.root)
-        self.env = dict(os.environ, PROSPECT_DIR=str(self.root),
+        self.url_file = self.root / "controle" / "url-aberta.txt"
+        self.env = dict(os.environ, PROSPECT_DIR=str(self.root), LAB_URL_FILE=str(self.url_file),
                         AI_PROSPECTOR_PROJETO_ARQUIVO=str(self.root / "controle" / ".projeto-lab"))
-        self.proc = None
-        self.port = None
-        out = subprocess.run([sys.executable, str(REPO / "scripts" / "gerar_painel.py"), "--no-open"],
-                             cwd=str(self.root), env=self.env, capture_output=True, text=True, timeout=120)
-        if out.returncode != 0:
-            raise Ambiente(f"gerar_painel.py falhou: {(out.stderr or out.stdout)[-400:]}")
-        self.index = self.root / "painel" / "index.html"
+        self.url = None
 
-    @property
-    def token(self):
-        return (self.root / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
-
-    def start(self):
-        self.log = self.root / "controle" / "servidor-lab.log"
-        log = open(self.log, "ab")
-        cmd = [sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(self.root)]
+    def abrir(self):
+        """What /painel does: gerar_painel.main() (starts or reuses the server, 'opens' the URL; see painel_lab.py)."""
         t0 = time.time()
-        self.proc = subprocess.Popen(cmd, cwd=str(self.root), env=self.env, stdout=log, stderr=log)
-
-        def up():
-            state = json.loads((self.root / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))
-            req = urllib.request.Request(f"http://127.0.0.1:{state['porta']}/api/estado", headers={"X-Painel-Token": self.token})
-            with urllib.request.urlopen(req, timeout=2) as r:
-                return state["porta"] if r.status == 200 else None
-        self.port = wait(up, SERVER_WAIT, step=0.2)
-        log.close()
-        if not self.port:
-            alive = self.proc.poll() is None
-            self.stop()
+        out = subprocess.run([sys.executable, str(HERE / "painel_lab.py")], cwd=str(self.root),
+                             env=self.env, capture_output=True, text=True, timeout=60)
+        self.url = wait(lambda: self.url_file.read_text(encoding="utf-8").strip(), SERVER_WAIT, step=0.2)
+        state = panel_state(self.root)
+        if out.returncode != 0 or not self.url or not state:
+            log = self.root / "controle" / ".painel-servidor.log"
             raise ServidorNaoSubiu(
-                f"servidor_painel.py não respondeu /api/estado em {SERVER_WAIT} s "
-                f"({'processo vivo' if alive else 'processo saiu com código ' + str(self.proc_exit)})\n"
-                f"comando: {cmd}\npasta: {self.root}\nPROSPECT_DIR={self.env.get('PROSPECT_DIR')}\n"
-                f"--- saída do servidor ---\n{self.log.read_text(errors='replace')}")
+                f"o painel não abriu em {SERVER_WAIT} s (gerar_painel.py saiu com {out.returncode})\n"
+                f"--- gerar_painel.py ---\n{out.stdout}\n{out.stderr}\n"
+                f"--- servidor ---\n{log.read_text(errors='replace') if log.exists() else '(sem log)'}")
+        if self.url != f"http://127.0.0.1:{state['porta']}/":
+            raise Falha(f"gerar_painel.py abriu {self.url}, mas o servidor está na porta {state['porta']}")
+        self.pid = int(state["pid"])
         self.subiu_em = round(time.time() - t0, 2)
-        return self.port
-
-    proc_exit = None
+        return self.url
 
     def stop(self):
-        if self.proc:
-            self.proc_exit = self.proc.poll()
-            self.proc.terminate()
-            try:
-                self.proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-            self.proc = None
+        state = panel_state(self.root)
+        if state:
+            kill(int(state["pid"]))
 
     def progresso(self):
         return json.loads((self.root / "controle" / "progresso.json").read_text(encoding="utf-8"))
@@ -147,10 +141,6 @@ class Projeto:
         except OSError:
             return set()
         return {f["id"] for f in data.get("feitos", [])}
-
-    @property
-    def http(self):
-        return f"http://127.0.0.1:{self.port}/index.html"
 
 
 # ---------------------------------------------------------------- browsers on disk / drivers
@@ -439,8 +429,8 @@ def panel_ready(pg, secs=STEP):
         raise Falha("o painel não mostrou nenhum item com Feito")
 
 
-def status_text(pg):
-    return pg.js("const e = document.getElementById('acao-status'); return e && !e.hidden ? e.textContent : ''") or ""
+def toast(pg):
+    return pg.js("const e = document.getElementById('aviso'); return e && !e.hidden ? e.textContent : ''") or ""
 
 
 def feito_e_desfazer(pg, proj, steps):
@@ -452,15 +442,15 @@ def feito_e_desfazer(pg, proj, steps):
     if pg.js("return document.querySelector('input[data-done]').disabled"):
         raise Falha("checkbox Feito desativado")
     pg.click("input[data-done]")
-    if not wait(lambda: item in proj.feitos() and proj.progresso() != before, 15):
-        raise Falha(f"Feito não gravou em 15 s (status: {status_text(pg)[:80]})")
+    if not wait(lambda: item in proj.feitos() and proj.progresso() != before, STEP):
+        raise Falha(f"Feito não gravou em {STEP} s (aviso: {toast(pg)[:80]!r})")
     steps.append(f"Feito gravou {item}")
     undo = f'[data-undo={json.dumps(item)}]'
     if not wait(lambda: pg.js(f"return !!document.querySelector({json.dumps(undo)})"), 10):
         raise Falha("Desfazer não apareceu em Enviados hoje")
     pg.click(undo)
-    if not wait(lambda: item not in proj.feitos() and proj.progresso() == before, 15):
-        raise Falha("Desfazer não voltou o progresso.json em 15 s")
+    if not wait(lambda: item not in proj.feitos() and proj.progresso() == before, STEP):
+        raise Falha(f"Desfazer não voltou o progresso.json em {STEP} s")
     steps.append("Desfazer voltou o progresso.json")
 
 
@@ -483,73 +473,41 @@ def relatorio(pg, steps, css="#pendentes a[data-relatorio]", tab=None):
         raise Falha("relatório com link javascript: ou HTML cru")
     steps.append(f"relatório abriu: {ok[:60]}")
     pg.click(".back a")
-    panel_ready(pg, 20)
+    panel_ready(pg)
     steps.append("Voltar ao painel funcionou")
 
 
 # ---------------------------------------------------------------- scenarios
+SENTINEL = ("document.querySelector('#pendentes').setAttribute('data-sentinela', 'lab'); "
+            "document.querySelector('#app').setAttribute('data-sentinela-app', 'lab'); return 1")
+SENTINEL_OK = ("return document.querySelector('#pendentes[data-sentinela=\"lab\"]') !== null && "
+               "document.querySelector('#app[data-sentinela-app=\"lab\"]') !== null")
+
+
 def cenario_a(ctx):
+    """painel/index.html opened from disk: only the instruction, no checkbox."""
     proj = Projeto(ctx.tmp, "A")
-    steps = []
     try:
-        proj.start()
         pg = ctx.page_file()
-        pg.open(proj.index.as_uri())
-        panel_ready(pg)
-        if not wait(lambda: "Marcou como Feito" in status_text(pg), STEP):
-            raise Falha(f"o arquivo não falou com o servidor (status: {status_text(pg)[:80]!r})")
-        steps.append("arquivo + servidor: online")
-        feito_e_desfazer(pg, proj, steps)
-        relatorio(pg, steps)
-        return steps
+        pg.open((proj.root / "painel" / "index.html").as_uri())
+        text = wait(lambda: pg.js("return document.body ? document.body.innerText : ''"), STEP) or ""
+        if FRASE not in " ".join(text.split()):
+            raise Falha(f"sem a frase do /painel (texto: {text[:80]!r})")
+        if pg.js("return document.querySelectorAll('input, [data-done]').length"):
+            raise Falha("a página do arquivo tem checkbox")
+        return ["arquivo: só a instrução do /painel, sem checkbox"]
     finally:
         ctx.finish("A")
-        proj.stop()
-
-
-def cenario_b(ctx):
-    proj = Projeto(ctx.tmp, "B")
-    steps = []
-    try:
-        pg = ctx.page_file()
-        pg.open(proj.index.as_uri())
-        panel_ready(pg)
-        pg.js(f"localStorage.removeItem('{QUEUE_KEY}'); return 1")
-        pg.reload()
-        panel_ready(pg)
-        before = proj.progresso()
-        item = pg.js("return document.querySelector('input[data-done]').getAttribute('data-done')")
-        if pg.js("return document.querySelector('input[data-done]').disabled"):
-            raise Falha("checkbox Feito desativado sem servidor")
-        pg.click("input[data-done]")
-        msg = wait(lambda: status_text(pg) if "Vou salvar" in status_text(pg) else None, 12)
-        if not msg:
-            raise Falha(f"sem a mensagem 'Vou salvar…' (status: {status_text(pg)[:80]!r})")
-        steps.append(f"sem servidor: {msg.strip()[:90]}")
-        if not pg.js(f"return !!document.querySelector('[data-undo={json.dumps(item)}]')"):
-            raise Falha("o item não foi para Enviados hoje na tela")
-        if proj.progresso() != before:
-            raise Falha("gravou sem servidor?")
-        proj.start()
-        pg.reload()
-        if not wait(lambda: item in proj.feitos() and proj.progresso() != before, 15):
-            raise Falha("ligou o servidor e recarregou: o Feito não foi salvo em 15 s")
-        if not wait(lambda: pg.js(f"return JSON.parse(localStorage.getItem('{QUEUE_KEY}') || '[]').length") == 0, 10):
-            raise Falha("a fila não esvaziou depois de salvar")
-        steps.append(f"servidor ligado + recarregar: {item} salvo e fila vazia")
-        return steps
-    finally:
-        ctx.finish("B")
-        proj.stop()
 
 
 def cenario_c(ctx):
     proj = Projeto(ctx.tmp, "C")
     steps = []
     try:
-        proj.start()
+        url = proj.abrir()
+        steps.append(f"gerar_painel.py abriu {url} em {proj.subiu_em} s")
         pg = ctx.page_http()
-        pg.open(proj.http)
+        pg.open(url)
         panel_ready(pg)
         feito_e_desfazer(pg, proj, steps)
         relatorio(pg, steps)
@@ -569,6 +527,7 @@ const cat = el => {
   if (el.matches('details.seal > summary')) return 'ver-detalhes';
   if (el.matches('input[data-done]')) return 'feito';
   if (el.matches('button[data-undo]')) return 'desfazer';
+  if (el.matches('button[data-retry]')) return 'tentar';
   if (el.matches('#pendentes a[data-relatorio]')) return 'relatorio-empresa';
   if (el.matches('#rodada a[data-relatorio]')) return 'relatorio-rodada';
   if (el.matches('button.toggle')) return 'ver-tabela';
@@ -580,6 +539,9 @@ return [...document.querySelectorAll('a, button, summary, input, select, textare
                href: el.getAttribute('href'), target: el.getAttribute('target'), rel: el.getAttribute('rel'),
                html: el.outerHTML.slice(0, 120)}));
 """
+FAIL_NEXT_FETCH = ("window.__fetchReal = window.fetch; window.fetch = (u, o) => (o && o.method === 'POST' && /api\\/feito/.test(u)) "
+                   "? (window.fetch = window.__fetchReal, Promise.resolve(new Response(JSON.stringify({ok: false, erro: 'falha simulada'}), "
+                   "{status: 500, headers: {'Content-Type': 'application/json'}}))) : window.__fetchReal(u, o); return 1")
 
 
 def cenario_d(ctx):
@@ -587,21 +549,18 @@ def cenario_d(ctx):
     proj = Projeto(ctx.tmp, "D")
     steps, bad = [], []
     try:
-        proj.start()
         pg = ctx.page_http()
-        pg.open(proj.http)
+        pg.open(proj.abrir())
         panel_ready(pg)
-        els = pg.js(CLASSIFY)
         cats = {}
-        for e in els:
+        for e in pg.js(CLASSIFY):
             if e["cat"] is None:
                 bad.append(f"clicável fora do inventário: {e['html']}")
             cats.setdefault(e["cat"], []).append(e)
         for need in ("aba", "chip", "copiar", "outra-versao", "feito", "relatorio-empresa", "relatorio-rodada", "ver-tabela", "externo"):
             if not cats.get(need):
                 bad.append(f"nenhum elemento '{need}' no painel fictício")
-        # external links: never clicked in CI
-        for e in cats.get("externo", []):
+        for e in cats.get("externo", []):  # external links: never clicked in CI
             if e["text"] not in EXTERNAL:
                 bad.append(f"link externo sem item no inventário: {e['text']!r}")
             if not re.match(r"^https://\S+$", e["href"] or ""):
@@ -609,22 +568,19 @@ def cenario_d(ctx):
             if e["target"] != "_blank" or "noopener" not in (e["rel"] or "").split():
                 bad.append(f"{e['text']}: falta target=_blank ou rel=noopener")
         steps.append(f"{len(cats.get('externo', []))} links externos conferidos (href/target/rel)")
-        # tabs
         for tab in ("rodada", "projeto", "responderam", "followups", "pendentes"):
             pg.click(f'nav.tabs a[href="#{tab}"]')
             if not wait(lambda: pg.js(f"return !document.getElementById('{tab}').hidden && "
                                       "[...document.querySelectorAll('main > section')].filter(s => !s.hidden).length === 1"), 5):
                 bad.append(f"aba {tab} não abriu")
         steps.append("5 abas")
-        # chips
         for target in pg.js("return [...document.querySelectorAll('button.chip[data-jump]')].map(b => b.getAttribute('data-jump'))"):
-            pg.js("window.scrollTo(0, 0); return 1")
+            pg.js("window.scrollTo({top: 0, behavior: 'instant'}); return 1")
             pg.click(f'button.chip[data-jump="{target}"]')
             if not wait(lambda: pg.js(f"const r = document.getElementById('{target}').getBoundingClientRect(); "
                                       "return r.top >= -5 && r.top < window.innerHeight"), 5):
                 bad.append(f"chip {target} não levou à seção")
         steps.append("chips")
-        # copy (first message) + "Outra versão" + its copy
         expected = pg.js("return document.querySelector('#p-linkedin ~ .list .msg').textContent")
         pg.click("#p-linkedin ~ .list button[data-copy]")
         label = wait(lambda: pg.js("const b = document.querySelector('#p-linkedin ~ .list button[data-copy]'); "
@@ -639,33 +595,47 @@ def cenario_d(ctx):
         if not wait(lambda: pg.js("return document.querySelector('details.after').open"), 3):
             bad.append("Outra versão não abriu")
         pg.click("details.after button[data-copy]")
-        if wait(lambda: pg.js("return document.querySelector('details.after button[data-copy]').textContent"), 3) not in ("Copiado ✓",):
+        if wait(lambda: pg.js("return document.querySelector('details.after button[data-copy]').textContent"), 3) != "Copiado ✓":
             bad.append("Copiar da outra versão não confirmou")
         if cats.get("ver-detalhes"):
             pg.click("details.seal > summary")
             if not pg.js("return document.querySelector('details.seal').open"):
                 bad.append("ver detalhes da conferência não abriu")
-        # Feito / Desfazer on one item of each list
         for group in ("p-hoje", "p-linkedin", "p-emails", "p-decisoes"):
-            css = f"#{group} + .list input[data-done], #{group} ~ .list input[data-done]"
-            item = pg.js(f"const g = document.getElementById('{group}'); let n = g.nextElementSibling; "
+            item = pg.js(f"const g = document.getElementById('{group}'); const n = g.nextElementSibling; "
                          "const e = n && n.querySelector('input[data-done]'); return e ? e.getAttribute('data-done') : null")
             if not item:
                 bad.append(f"{group}: sem item com Feito")
                 continue
             before = proj.progresso()
             pg.click(f'input[data-done={json.dumps(item)}]')
-            if not wait(lambda: item in proj.feitos() and proj.progresso() != before, 15):
+            if not wait(lambda: item in proj.feitos() and proj.progresso() != before, STEP):
                 bad.append(f"Feito em {group} não gravou")
                 continue
             undo = f'[data-undo={json.dumps(item)}]'
             wait(lambda: pg.js(f"return !!document.querySelector({json.dumps(undo)})"), 10)
             pg.click(undo)
-            if not wait(lambda: item not in proj.feitos() and proj.progresso() == before, 15):
+            if not wait(lambda: item not in proj.feitos() and proj.progresso() == before, STEP):
                 bad.append(f"Desfazer em {group} não voltou")
             panel_ready(pg)
         steps.append("Feito + Desfazer em Fazer hoje, LinkedIn, E-mails e Decisões")
-        # charts: Ver tabela / Ver gráfico
+        # a server error: the checkbox goes back, the reason and "Tentar de novo" appear; the retry records it
+        item = pg.js("return document.querySelector('input[data-done]').getAttribute('data-done')")
+        before = proj.progresso()
+        pg.js(FAIL_NEXT_FETCH)
+        pg.click(f'input[data-done={json.dumps(item)}]')
+        if not wait(lambda: "falha simulada" in toast(pg) and pg.js("return !!document.querySelector('#aviso button[data-retry]')"), 6):
+            bad.append(f"erro do servidor sem motivo e sem 'Tentar de novo' (aviso: {toast(pg)[:80]!r})")
+        elif pg.js(f"const c = document.querySelector('input[data-done={json.dumps(item)}]'); return c.checked || c.disabled"):
+            bad.append("depois do erro o checkbox não voltou ao estado anterior")
+        else:
+            pg.click("#aviso button[data-retry]")
+            if not wait(lambda: item in proj.feitos() and proj.progresso() != before, STEP):
+                bad.append("Tentar de novo não gravou")
+            else:
+                steps.append("erro do servidor: motivo + Tentar de novo gravou")
+                pg.click(f'[data-undo={json.dumps(item)}]')
+                wait(lambda: item not in proj.feitos(), STEP)
         pg.click('nav.tabs a[href="#projeto"]')
         n = pg.js("return document.querySelectorAll('#projeto button.toggle').length")
         for i in range(n):
@@ -677,7 +647,6 @@ def cenario_d(ctx):
             if pg.js(f"return document.querySelectorAll('#projeto button.toggle')[{i}].closest('.card').classList.contains('show-table')"):
                 bad.append(f"Ver gráfico {i + 1} não voltou")
         steps.append(f"{n} botões Ver tabela")
-        # reports: company (Pendentes) and round (Última rodada)
         pg.click('nav.tabs a[href="#pendentes"]')
         try:
             relatorio(pg, steps)
@@ -692,16 +661,89 @@ def cenario_d(ctx):
         proj.stop()
 
 
+def cenario_ef(ctx):
+    """E: 70 s without interaction, nothing is redrawn. F: server killed, Feito says it once, 40 s later too."""
+    proj = Projeto(ctx.tmp, "EF")
+    res = {}
+    try:
+        pg = ctx.page_http()
+        pg.open(proj.abrir())
+        panel_ready(pg)
+        pg.js(SENTINEL)
+        time.sleep(70)
+        if not pg.js(SENTINEL_OK):
+            res["E"] = Falha("a tela se redesenhou sozinha em 70 s (sentinela sumiu)")
+        elif toast(pg):
+            res["E"] = Falha(f"apareceu um aviso sem clique: {toast(pg)[:80]!r}")
+        else:
+            res["E"] = ["70 s sem interação: o conteúdo não foi substituído (2 batimentos)"]
+        ctx.finish("E", keep=True)
+        kill(proj.pid)
+        if not wait(lambda: wait_pid_dead(proj.pid), 10):
+            raise Ambiente("não consegui encerrar o servidor para o cenário F")
+        pg.click("input[data-done]")
+        if not wait(lambda: ENDED in toast(pg), 8):
+            res["F"] = Falha(f"servidor encerrado: Feito não mostrou o aviso (aviso: {toast(pg)[:80]!r})")
+            return res
+        if pg.js("const c = document.querySelector('input[data-done]'); return c.checked || c.disabled"):
+            res["F"] = Falha("servidor encerrado: o checkbox não voltou ao estado anterior")
+            return res
+        time.sleep(40)
+        count = pg.js(f"return document.body.innerText.split({json.dumps(ENDED)}).length - 1")
+        if not pg.js(SENTINEL_OK):
+            res["F"] = Falha("depois do encerramento a tela se redesenhou (sentinela sumiu)")
+        elif count != 1:
+            res["F"] = Falha(f"o aviso apareceu {count} vezes")
+        else:
+            res["F"] = ["servidor encerrado: aviso uma vez só; 40 s depois, nada redesenhado e o aviso ainda único"]
+        return res
+    finally:
+        ctx.finish("F")
+        proj.stop()
+
+
+def wait_pid_dead(pid):
+    from common import pid_alive
+    return not pid_alive(pid)
+
+
+def cenario_g(ctx):
+    """Closing the panel tab turns the server off within 20 s."""
+    proj = Projeto(ctx.tmp, "G")
+    try:
+        pg = ctx.page_http()
+        pg.open(proj.abrir())
+        panel_ready(pg)
+        time.sleep(1.5)  # the first heartbeat registers this tab
+        drv = pg.drv
+        panel = drv.current_window_handle
+        try:
+            drv.switch_to.new_window("tab")
+            other = drv.current_window_handle
+            drv.switch_to.window(panel)
+            drv.close()
+            drv.switch_to.window(other)
+        except WebDriverException as e:
+            raise Ambiente(f"o driver não conseguiu fechar só a aba: {first_line(e)}") from e
+        t0 = time.time()
+        gone = wait(lambda: wait_pid_dead(proj.pid) and not (proj.root / "controle" / ".painel-servidor.json").exists(), 20, step=0.5)
+        if not gone:
+            raise Falha("fechou a aba: o servidor não terminou em 20 s")
+        return [f"fechou a aba: servidor terminou e apagou o .painel-servidor.json em {round(time.time() - t0, 1)} s"]
+    finally:
+        ctx.finish("G")
+        proj.stop()
+
+
 # ---------------------------------------------------------------- per browser
 class Ctx:
     def __init__(self, so, nav, out, tmp, browser):
         self.so, self.nav, self.out, self.tmp, self.browser = so, nav, Path(out), tmp, browser
         self.pg = None
+        self.last_shot, self.last_console = None, None
 
     def page_file(self):
         if self.nav == "safari":
-            if getattr(self.browser, "apple_off", None):
-                raise Ambiente(self.browser.apple_off)
             self.pg = SafariApple()
         else:
             self.pg = Pagina(self.browser.driver())
@@ -723,13 +765,18 @@ class Ctx:
         except WebDriverException:
             return None
 
-    def finish(self, cenario):
+    def finish(self, cenario, keep=False):
         pg = self.pg
         if not pg:
             return
         self.last_shot = f"{self.so}-{self.nav}-{cenario}.png"
-        pg.shot(self.out / self.last_shot)
+        try:
+            pg.shot(self.out / self.last_shot)
+        except Exception:  # noqa: BLE001
+            pass
         self.last_console = pg.console(self.nav)
+        if keep:
+            return
         if pg.drv:
             quit_driver(pg.drv)
         elif isinstance(pg, SafariApple):
@@ -737,26 +784,37 @@ class Ctx:
         self.pg = None
 
 
-def run_scenario(fn, ctx):
+def outcome(fn, ctx):
+    """Run a scenario function -> {name: result}; F/E come together from cenario_ef."""
     t0 = time.time()
     ctx.last_shot, ctx.last_console = None, None
     try:
-        steps = fn(ctx)
-        res = {"status": "ok", "motivo": "", "passos": steps}
+        got = fn(ctx)
+        got = got if isinstance(got, dict) else {None: got}
     except Falha as e:
-        res = {"status": "falha", "motivo": str(e)}
+        got = {None: e}
     except Ambiente as e:
-        res = {"status": "ambiente", "motivo": str(e)}
-        if ctx.nav == "safari" and ("AppleScript" in str(e) or "Apple Events" in str(e)):
-            ctx.browser.apple_off = str(e)
+        got = {None: Ambiente(str(e))}
     except JavascriptException as e:  # the page did not have what the step expected
-        res = {"status": "falha", "motivo": f"erro na página: {first_line(e)}"}
+        got = {None: Falha(f"erro na página: {first_line(e)}")}
     except WebDriverException as e:
-        res = {"status": "ambiente", "motivo": f"WebDriver: {first_line(e)}"}
-    except (OSError, subprocess.SubprocessError) as e:  # osascript / runner
-        res = {"status": "ambiente", "motivo": f"{type(e).__name__}: {first_line(e)}"}
-    res.update({"segundos": round(time.time() - t0, 1), "screenshot": ctx.last_shot, "console": ctx.last_console})
+        got = {None: Ambiente(f"WebDriver: {first_line(e)}")}
+    except (OSError, subprocess.SubprocessError) as e:
+        got = {None: Ambiente(f"{type(e).__name__}: {first_line(e)}")}
+    res = {}
+    for name, val in got.items():
+        if isinstance(val, Falha):
+            r = {"status": "falha", "motivo": str(val)}
+        elif isinstance(val, Ambiente):
+            r = {"status": "ambiente", "motivo": str(val)}
+        else:
+            r = {"status": "ok", "motivo": "", "passos": val}
+        r.update({"segundos": round(time.time() - t0, 1), "screenshot": ctx.last_shot, "console": ctx.last_console})
+        res[name] = r
     return res
+
+
+PLAN = (("A", cenario_a), ("C", cenario_c), ("D", cenario_d), ("EF", cenario_ef), ("G", cenario_g))
 
 
 def run_browser(nav, so, out, tmp):
@@ -764,22 +822,27 @@ def run_browser(nav, so, out, tmp):
     try:
         browser = Navegador(nav, tmp)
     except Ambiente as e:
-        res["cenarios"] = {c: {"status": "ambiente", "motivo": str(e)} for c in SCENARIOS}
+        res["cenarios"] = {c: {"status": "ambiente", "motivo": str(e), "aviso": True} for c in SCENARIOS}
         return res
     ctx = Ctx(so, nav, out, tmp, browser)
-    for name, fn in zip(SCENARIOS, (cenario_a, cenario_b, cenario_c, cenario_d)):
-        r = run_scenario(fn, ctx)
-        if r["status"] == "ambiente" and not getattr(browser, "apple_off", None):  # one more try; then a warning
-            first = r["motivo"]
-            r = run_scenario(fn, ctx)
-            r["tentativas"] = 2
-            if r["status"] == "ambiente":
-                r["aviso"] = True
-                r["primeira_tentativa"] = first
-        if r["status"] == "ambiente":
-            r["aviso"] = True
-        res["cenarios"][name] = r
-        print(f"   {name}: {r['status']} {r.get('motivo', '')[:160]}", flush=True)
+    for key, fn in PLAN:
+        names = ("E", "F") if key == "EF" else (key,)
+        got = outcome(fn, ctx)
+        if None in got:  # the whole function failed before splitting E/F: the same result for both
+            got = {n: dict(got[None]) for n in names}
+        if any(got[n]["status"] == "ambiente" for n in names):  # one more try; if it persists, a warning
+            first = {n: got[n].get("motivo") for n in names}
+            again = outcome(fn, ctx)
+            if None in again:
+                again = {n: dict(again[None]) for n in names}
+            got = again
+            for n in names:
+                got[n]["tentativas"] = 2
+                if got[n]["status"] == "ambiente":
+                    got[n].update({"aviso": True, "primeira_tentativa": first[n]})
+        for n in names:
+            res["cenarios"][n] = got[n]
+            print(f"   {n}: {got[n]['status']} {got[n].get('motivo', '')[:160]}", flush=True)
     res["versao"] = browser.versao
     return res
 
@@ -800,28 +863,32 @@ def main(argv=None):
     results = {"so": args.so, "modo": args.modo, "headless": HEADLESS, "plataforma": platform.platform(),
                "maquina": platform.machine(), "python": sys.version.split()[0], "selenium": selenium.__version__,
                "navegadores": []}
-    failed = False
-    # the server must start ONCE before anything else; otherwise stop the job now, with its full output
+
+    def save():
+        (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    # the real /painel must open ONCE before anything else; otherwise stop the job now, with its full output
     pre = Projeto(tmp, "preflight")
     try:
-        pre.start()
+        pre.abrir()
         results["servidor_subiu_em_s"] = pre.subiu_em
-        print(f"servidor_painel.py respondeu /api/estado em {pre.subiu_em} s (porta {pre.port})", flush=True)
-    except ServidorNaoSubiu as e:
+        print(f"gerar_painel.py abriu {pre.url} em {pre.subiu_em} s", flush=True)
+    except (ServidorNaoSubiu, Falha) as e:
         print(str(e), flush=True)
         results["erro_servidor"] = str(e)
-        (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+        save()
         return 1
     finally:
         pre.stop()
+    failed = False
     for nav in [b.strip() for b in args.browsers.split(",") if b.strip()]:
         print(f"== {args.so} / {nav}", flush=True)
         try:
             r = run_browser(nav, args.so, out, tmp)
-        except ServidorNaoSubiu as e:  # stop the job at once
+        except ServidorNaoSubiu as e:
             print(str(e), flush=True)
             results["erro_servidor"] = str(e)
-            (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+            save()
             return 1
         except Exception:  # noqa: BLE001 - a bug in the lab itself
             r = {"so": args.so, "navegador": nav, "erro_do_laboratorio": traceback.format_exc()}
@@ -829,7 +896,7 @@ def main(argv=None):
         results["navegadores"].append(r)
         if r.get("erro_do_laboratorio") or any(c["status"] == "falha" for c in r.get("cenarios", {}).values()):
             failed = True
-        (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+        save()
     return 1 if failed else 0
 
 

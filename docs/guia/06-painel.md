@@ -4,9 +4,11 @@
 
 O painel é o lugar onde você vê tudo o que precisa fazer, de todas as rodadas, sem abrir outro arquivo. Ao fim de cada rodada, o `/next-companies` roda `python3 scripts/gerar_painel.py`, que grava os dados, liga o servidor local e abre o painel no navegador padrão (macOS, Linux e Windows), já na aba **Pendentes**.
 
-**Como abrir:** Dê duplo clique em painel/index.html, ou rode /painel. Se o painel for aberto direto e a gravação estiver desligada, o clique fica guardado e é salvo sozinho na próxima vez que o /painel ou o robô rodar.
+**Como abrir o painel:** rode /painel no Claude Code. Ele também abre sozinho no fim de cada rodada. O painel roda só no seu computador e desliga quando você fecha a aba.
 
-Nada sai do seu computador. O botão Feito grava no projeto por um programinha que roda só no seu computador, só enquanto o painel está em uso. Esse programa é o `scripts/servidor_painel.py`. Ele usa só a biblioteca padrão do Python e escuta em `http://127.0.0.1:47321` (se a porta estiver ocupada, tenta da 47322 à 47330). Só aceita pedidos deste computador que tragam a chave do projeto (`controle/.painel-token`, criada uma vez). Para sozinho 30 minutos depois do último uso; enquanto o painel está aberto, a página avisa a cada minuto que ainda está em uso. Nada liga junto com o computador.
+Funciona como um app local (no estilo do Jupyter): o `/painel` liga um servidor só no seu computador (`scripts/servidor_painel.py`, só biblioteca padrão do Python, em `http://127.0.0.1` numa porta que o sistema escolhe) e abre o painel no navegador. Nada sai do seu computador. Se o painel já estiver aberto, o `/painel` reaproveita o mesmo servidor; nunca há dois para o mesmo projeto. Ao fechar a aba, o servidor desliga em até 15 segundos (recarregar a página não desliga). Se ninguém usar o painel por 3 minutos, ele também desliga. Nada liga junto com o computador.
+
+Abrir o `painel/index.html` direto do disco mostra só uma tela com a instrução de abrir pelo `/painel`.
 
 ## `/painel`: abrir o painel de qualquer pasta
 
@@ -23,13 +25,12 @@ O projeto é encontrado nesta ordem: a variável `PROSPECT_DIR`; o caminho grava
 Pelo terminal:
 
 ```bash
-python3 scripts/gerar_painel.py             # macOS e Linux (liga o servidor e abre o painel)
+python3 scripts/gerar_painel.py             # macOS e Linux (liga ou reaproveita o servidor e abre o painel)
 py -3 scripts\gerar_painel.py               # Windows
 python3 scripts/gerar_painel.py --no-open   # só atualiza os dados, sem servidor e sem navegador
-python3 scripts/gerar_painel.py --arquivo   # abre o painel sem ligar o servidor (os cliques ficam guardados)
 ```
 
-O script lê `relatorio-parcial.md` (seções 2, 3 e 4), os rascunhos de `rascunhos/linkedin/` e `rascunhos/email/`, `controle/progresso.json`, todos os `relatorios/rodada-*.md` e `relatorio-final.xlsx`. Ele grava `painel/data.json`, `painel/data.js`, `painel/servidor.js` e os relatórios em HTML de `painel/relatorios/`, tudo dado pessoal e fora do git.
+O script lê `relatorio-parcial.md` (seções 2, 3 e 4), os rascunhos de `rascunhos/linkedin/` e `rascunhos/email/`, `controle/progresso.json`, todos os `relatorios/rodada-*.md` e `relatorio-final.xlsx`. Ele grava `painel/data.json` e os relatórios em HTML de `painel/relatorios/`, tudo dado pessoal e fora do git. Enquanto o servidor está ligado, ele guarda o próprio endereço em `controle/.painel-servidor.json` e apaga esse arquivo ao desligar.
 
 **Demo com dados fictícios:** [roni-clei-santos.github.io/ai-company-prospector/demo](https://roni-clei-santos.github.io/ai-company-prospector/demo/)
 
@@ -44,9 +45,9 @@ No topo, os totais: "X mensagens de LinkedIn, Y e-mails, Z follow-ups vencidos e
 
 ### "Feito": marcou, está registrado
 
-Cada item tem a caixinha **Feito**, que funciona do jeito que você abrir o painel: duplo clique no `index.html`, favorito, `/painel` ou o robô. Ao clicar, o item é riscado e vai na hora para **Enviados hoje**. O painel então avisa o servidor local, que chama o `scripts/registrar.py` e grava o item como ENVIADO com a data de hoje em todos os lugares onde o robô registra envio: `controle/progresso.json` (histórico), `relatorio-parcial.md` (✅ na seção 3 ou 4), o relatório da empresa em `relatorios/`, o arquivo do rascunho, `controle/historico-contatos.md` e a linha da empresa no `relatorio-final.xlsx`. Gravado, aparece **"Marcou como Feito, está registrado."** O botão **Desfazer** reverte exatamente o que foi gravado.
+Cada item tem a caixinha **Feito**. Ao clicar, o painel avisa o servidor local, que chama o `scripts/registrar.py` e grava o item, na hora, como ENVIADO com a data de hoje em todos os lugares onde o robô registra envio: `controle/progresso.json` (histórico), `relatorio-parcial.md` (✅ na seção 3 ou 4), o relatório da empresa em `relatorios/`, o arquivo do rascunho, `controle/historico-contatos.md` e a linha da empresa no `relatorio-final.xlsx`. O item vai para **Enviados hoje** e aparece **"Marcou como Feito, está registrado."** O botão **Desfazer** reverte exatamente o que foi gravado. Clicar duas vezes no mesmo item não grava duas vezes.
 
-Se o servidor estiver desligado (por exemplo, painel aberto direto, mais de 30 minutos depois do último uso), o clique não se perde. Ele fica guardado no navegador e aparece: **"Marcado. Vou salvar no projeto na próxima vez que o painel for aberto pelo /painel ou pelo robô. (N cliques guardados)"**. Quando o servidor volta, a página manda os cliques guardados, na ordem, e mostra o estado real do projeto. Ela tenta ao abrir, a cada clique, a cada 10 segundos e quando você volta para a aba. Mandar o mesmo clique duas vezes não grava duas vezes.
+Só a caixinha clicada espera a resposta, por no máximo 5 segundos. Se não der certo, ela volta como estava e aparece o motivo, com o botão **Tentar de novo**; nada é repetido sozinho. Se o servidor tiver sido desligado com a página aberta, aparece uma vez: **"O painel foi encerrado. Rode /painel para abrir de novo."** A tela nunca se redesenha sozinha: só muda quando você clica ou troca de aba.
 
 O seu clique é a fonte da verdade. A conferência no LinkedIn e no Gmail (no passo 1 de cada rodada do `/next-companies`) continua só para os itens que você NÃO marcou, para pegar envios que você esqueceu de marcar, e para as respostas recebidas. Ela nunca desmarca um item que você marcou. Na demo do GitHub Pages, o "Feito" só risca o item na tela (aviso "demonstração").
 
@@ -76,6 +77,6 @@ Quem respondeu nas últimas rodadas e todos os follow-ups marcados (em laranja, 
 
 ## Para quem contribui
 
-A demo do GitHub Pages (`docs/demo/`) é uma cópia do painel que lê `painel/demo-data.json`. Depois de mudar `painel/index.html` ou os dados de demo, rode `python3 scripts/gerar_painel.py --demo`. As abas também abrem por link: `index.html#pendentes`, `#rodada`, `#projeto`, `#responderam`, `#followups`.
+A página do painel fica em `scripts/painel_template.html` (o servidor a entrega com a chave de cada execução). A demo do GitHub Pages (`docs/demo/`) é uma cópia dela que lê `painel/demo-data.json` e só risca na tela. Depois de mudar o template ou os dados de demo, rode `python3 scripts/gerar_painel.py --demo`. As abas também abrem por link: `#pendentes`, `#rodada`, `#projeto`, `#responderam`, `#followups`.
 
 [← Rodada](05-rodada.md) · [Próximo: FAQ e erros →](07-faq-e-erros.md)

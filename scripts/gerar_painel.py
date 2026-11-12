@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-"""Build painel/data.json (and painel/data.js) from the project files, and open the panel.
+"""Build the panel data and open the panel: /painel and the end of every robot round run this script.
 
 Reads: controle/progresso.json, relatorios/rodada-*.md, relatorio-final.xlsx (or the company sheet),
 relatorio-parcial.md (sections 2, 3 and 4) and the drafts in rascunhos/linkedin/ and rascunhos/email/
 (for the "Pendentes" tab: everything the candidate still has to send or decide, from every round).
-Writes: painel/data.json, painel/data.js (`window.PAINEL_DATA = ...`, loaded with <script src>, so the
-panel also opens straight from disk), painel/relatorios/*.html (the reports cited by the panel) and,
-the first time, painel/servidor.js. All of them are personal data and are gitignored. It also saves
-the project folder in ~/.config/ai-company-prospector/projeto, so /painel works from any folder.
+Writes: painel/data.json (a snapshot of the data) and painel/relatorios/*.html (the reports cited by the
+panel). Both are personal data and are gitignored. It also saves the project folder in
+~/.config/ai-company-prospector/projeto, so /painel works from any folder.
 
-It starts (or reuses) the local server scripts/servidor_painel.py (http://127.0.0.1:47321, standard
-library only, stops by itself after 30 minutes without use) and opens painel/index.html in the default
-browser. Every "Feito" click is recorded in the project; with the server off, the page keeps the click
-and sends it the next time the panel is open with the server on.
+Then, like a local app (Jupyter style): it reuses the server of this project if it is running, or starts
+scripts/servidor_painel.py (http://127.0.0.1, port chosen by the system, standard library only), and opens
+the panel in the default browser. The server stops by itself when the panel tab is closed.
 
 Usage (from any folder; on Windows use `py -3` instead of `python3`):
-  python3 scripts/gerar_painel.py             build the data, start the local server and open the panel
+  python3 scripts/gerar_painel.py             build the data, start (or reuse) the server and open the panel
   python3 scripts/gerar_painel.py --no-open   build the data only (no server, no browser)
-  python3 scripts/gerar_painel.py --arquivo   build and open painel/index.html without starting the server
-  python3 scripts/gerar_painel.py --demo      copy the panel + painel/demo-data.json to docs/demo/ (GitHub Pages)
+  python3 scripts/gerar_painel.py --demo      build docs/demo/ (GitHub Pages) from scripts/painel_template.html
 """
 import collections
 import json
@@ -36,9 +33,9 @@ from urllib.parse import unquote
 import openpyxl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import (DO_NOT_CONTACT, NO_PROJECT, PANEL_PORTS, SERVER_JS, _fold, do_not_contact,  # noqa: E402
-                    find_company_sheet, find_project, mentions_person, normalize_url, painel_token,
-                    read_profile_fields, save_project_pointer, split_status, write_server_js)
+from common import (DO_NOT_CONTACT, NO_PROJECT, PANEL_STATE, _fold, do_not_contact,  # noqa: E402
+                    find_company_sheet, find_project, mentions_person, normalize_url, panel_state, panel_url,
+                    read_profile_fields, save_project_pointer, split_status)
 from relatorio_html import html_name, render_reports  # noqa: E402
 
 GMAIL_DRAFTS = "https://mail.google.com/mail/u/0/#drafts"
@@ -711,12 +708,16 @@ def render_cited_reports(root, data):
     return done
 
 
+TEMPLATE = Path(__file__).resolve().parent / "painel_template.html"
+# files of the previous design (page opened from disk, fixed port, persistent token): removed when found
+OLD_FILES = (Path("painel") / "data.js", Path("painel") / "servidor.js", Path("controle") / ".painel-token")
+
+
 def build_demo():
     repo = Path(__file__).resolve().parent.parent
-    html = (repo / "painel" / "index.html").read_text(encoding="utf-8")
+    html = TEMPLATE.read_text(encoding="utf-8")
     html = html.replace('<meta name="painel-data" content="data.json">', '<meta name="painel-data" content="demo-data.json">')
-    html = html.replace('<script src="servidor.js" onerror="void 0"></script>\n', "")
-    html = html.replace('<script src="data.js" onerror="void 0"></script>\n', "")
+    html = html.replace('<script>window.PAINEL_SERVIDOR = { token: "__PAINEL_TOKEN__" };</script>\n', "")
     out = repo / "docs" / "demo"
     out.mkdir(parents=True, exist_ok=True)
     (out / "index.html").write_text(html, encoding="utf-8")
@@ -724,121 +725,37 @@ def build_demo():
     print("docs/demo/index.html + docs/demo/demo-data.json")
 
 
-def _mac_default_browser():
-    """Bundle id of the default web browser on macOS (LaunchServices), or None."""
-    import plistlib
-    plist = Path.home() / "Library" / "Preferences" / "com.apple.LaunchServices" / "com.apple.launchservices.secure.plist"
-    try:
-        handlers = plistlib.loads(plist.read_bytes()).get("LSHandlers", [])
-    except (OSError, ValueError, plistlib.InvalidFileException):
-        return None
-    for scheme in ("https", "http"):
-        for h in handlers:
-            if h.get("LSHandlerURLScheme") == scheme and h.get("LSHandlerRoleAll"):
-                return h["LSHandlerRoleAll"]
-    return None
-
-
-def _windows_browser_command(uri):
-    """Command line that opens `uri` in the default web browser on Windows, or None."""
-    import winreg
-    try:
-        key = r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice"
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
-            progid = winreg.QueryValueEx(k, "ProgId")[0]
-        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, progid + r"\shell\open\command") as k:
-            cmd = winreg.QueryValueEx(k, "")[0]
-    except OSError:
-        return None
-    return cmd.replace("%1", uri) if "%1" in cmd else f'{cmd} "{uri}"'
-
-
-def open_file_in_browser(uri):
-    """Open a file:// page in the default WEB BROWSER (not in the app associated with .html). True if it opened."""
-    try:
-        if sys.platform == "darwin":
-            bundle = _mac_default_browser() or "com.apple.Safari"
-            return subprocess.run(["open", "-b", bundle, uri], capture_output=True, timeout=30).returncode == 0
-        if os.name == "nt":
-            cmd = _windows_browser_command(uri)
-            if not cmd:
-                return False
-            subprocess.Popen(cmd, close_fds=True,
-                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-            return True
-        return bool(webbrowser.open(uri))
-    except (OSError, subprocess.SubprocessError, webbrowser.Error):
-        return False
-
-
-def open_panel(index_html, server_url=None):
-    """Open the panel in the default browser (macOS, Linux and Windows). Returns what was opened, or None.
-
-    The page from disk (file://) comes first: it is the same page as a double click on painel/index.html,
-    so the "Feito" clicks kept in that page (localStorage) are sent as soon as it opens with the server on.
-    If the file cannot be opened in a browser, the server address is opened instead."""
-    uri = Path(index_html).resolve().as_uri()
-    if Path(index_html).exists() and open_file_in_browser(uri):
-        return uri
-    try:
-        if server_url and webbrowser.open(server_url):
-            return server_url
-        if Path(index_html).exists() and webbrowser.open(uri):
-            return uri
-    except webbrowser.Error:
-        pass
-    return None
-
-
-def _server_info(port, token, timeout=1.5):
-    req = urllib.request.Request(f"http://127.0.0.1:{int(port)}/api/estado", headers={"X-Painel-Token": token})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
-
-
-def _running_server(root):
-    """URL of a server (this version) already running for this project, or None."""
+def ensure_server(root, wait=20.0):
+    """URL of the panel server of this project: the running one, or a new one started in the background
+    (detached, macOS, Linux and Windows). Never two servers for the same project. None if it did not start."""
     root = Path(root)
-    token = painel_token(root)
-    ports = list(PANEL_PORTS)
-    try:
-        state = json.loads((root / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))
-        ports.insert(0, int(state["porta"]))
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    for port in dict.fromkeys(ports):
-        try:
-            info = _server_info(port, token)
-        except (OSError, ValueError):
-            continue
-        if info.get("versao", 0) >= 2 and Path(info.get("raiz") or "").resolve() == root.resolve():
-            return f"http://127.0.0.1:{port}/index.html"
-    return None
 
+    def wait_url(secs):
+        end = time.time() + secs
+        while time.time() < end:
+            url = panel_url(root)
+            if url:
+                return url
+            time.sleep(0.25)
+        return None
 
-def ensure_server(root, wait=45.0):
-    """Start scripts/servidor_painel.py in the background (detached, all 3 systems) unless one is running."""
-    url = _running_server(root)
-    if url:
-        return url
+    if panel_state(root):  # a live server of this project: reuse it
+        url = wait_url(5)
+        if url:
+            return url
+        (root / PANEL_STATE).unlink(missing_ok=True)  # alive but not answering: start a new one
     script = Path(__file__).resolve().parent / "servidor_painel.py"
     kwargs = {}
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
     else:
         kwargs["start_new_session"] = True
-    log = Path(root) / "controle" / ".painel-servidor.log"
+    log = root / "controle" / ".painel-servidor.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     with open(log, "ab") as fh:
         subprocess.Popen([sys.executable, str(script), "--raiz", str(root)], stdin=subprocess.DEVNULL,
                          stdout=fh, stderr=fh, close_fds=True, cwd=str(root), **kwargs)
-    deadline = time.time() + wait
-    while time.time() < deadline:
-        url = _running_server(root)
-        if url:
-            return url
-        time.sleep(0.3)
-    return None
+    return wait_url(wait)
 
 
 def main(argv=None):
@@ -854,28 +771,25 @@ def main(argv=None):
     out = root / "painel"
     out.mkdir(exist_ok=True)
     render_cited_reports(root, data)
-    payload = json.dumps(data, ensure_ascii=False, indent=2)
-    (out / "data.json").write_text(payload + "\n", encoding="utf-8")
-    (out / "data.js").write_text(f"window.PAINEL_DATA = {payload};\n", encoding="utf-8")
+    (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    for old in OLD_FILES:
+        (root / old).unlink(missing_ok=True)
     save_project_pointer(root)
-    if not (root / SERVER_JS).exists():  # the server rewrites it with its real port when it starts
-        write_server_js(root, PANEL_PORTS[0], painel_token(root))
     p = data["projeto"]
     print(f"painel/data.json: {p['concluidas']} de {p['total']} empresas; "
           f"rodada: {data['rodada']['arquivo'] if data['rodada'] else 'nenhuma'}")
     if "--no-open" in args:
         return
-    url = None if "--arquivo" in args else ensure_server(root)
-    if url is None and "--arquivo" not in args:
-        print("Não consegui iniciar o servidor local agora. O painel abre do arquivo e guarda os cliques em "
-              "\"Feito\" até a próxima vez que o /painel ou o robô rodar.")
-    elif url:
-        print(f"Servidor local: {url.rsplit('/', 1)[0]} (só neste computador)")
-    opened = open_panel(out / "index.html", url)
-    if opened:
-        print(f"Painel aberto no navegador: {opened}")
-    else:
-        print(f"Abra no navegador: {(out / 'index.html').resolve().as_uri()}")
+    url = ensure_server(root)
+    if not url:
+        log = root / "controle" / ".painel-servidor.log"
+        print(f"Não consegui ligar o painel. Veja {log}.")
+        sys.exit(1)
+    try:
+        opened = webbrowser.open(url)
+    except webbrowser.Error:
+        opened = False
+    print(f"Painel aberto no navegador: {url}" if opened else f"Abra no navegador: {url}")
 
 
 if __name__ == "__main__":

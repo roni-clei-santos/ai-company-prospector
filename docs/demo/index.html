@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="painel-data" content="demo-data.json">
+<meta name="referrer" content="no-referrer">
 <title>Painel da prospecção</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -173,8 +174,12 @@
   .mode-line { margin: 0 0 12px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--navy-2); color: var(--ink-2); font-size: 13px; font-weight: 600; }
   .mode-line.on { border-color: rgba(61, 214, 140, .45); color: var(--ok); }
   .mode-line.bad { border-color: rgba(255, 193, 69, .5); color: var(--warn); }
-  .done-box.off { opacity: .55; cursor: not-allowed; }
-  .done-box.off input { cursor: not-allowed; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 30; max-width: min(640px, calc(100vw - 32px));
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--navy-2); color: var(--ink); font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .toast.on { border-color: rgba(61, 214, 140, .55); color: var(--ok); }
+  .toast.bad { border-color: rgba(255, 193, 69, .6); color: var(--warn); }
+  .toast[hidden] { display: none; }
   .task .n.ok { background: var(--ok); color: var(--navy); }
   .task.sent { opacity: .9; }
   .line code { color: var(--ink-2); }
@@ -209,6 +214,7 @@
 </main>
 
 <div id="tip" role="tooltip"></div>
+<div id="aviso" class="toast" role="status" hidden></div>
 <footer>
   <div class="wrap" id="foot">Gerado por <code>scripts/gerar_painel.py</code>. A IA rascunha, você decide e envia.
     <div class="author">Feito por Roni Clei Santos · <a href="https://www.linkedin.com/in/roni-clei-santos/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">Dar uma estrela no projeto</a></div></div>
@@ -316,124 +322,90 @@
   }
 
   // ---------- "Feito": the candidate's click is the source of truth ----------
-  // The click changes the screen at once, enters a queue in localStorage ("painel-fila-v1") and is sent,
-  // in order, to the local server (scripts/servidor_painel.py; address and token in servidor.js). It works
-  // from the server (http) and straight from disk (file://, through CORS). Server off: the queue waits and
-  // is sent on load, on every click, every 10 s, on focus/visibility/online. Demo (GitHub Pages): only strikes.
-  let MODE = "real";        // "real" | "demo"
-  let DATA = null;          // last data: data.js, or /data.json from the server
-  let ONLINE = null;        // last contact with the server: null (not yet), true, false
-  let ERRO = "";            // last error that is not "server off"
-  const QKEY = "painel-fila-v1";
-  let MEMQ = [];
-  const qLoad = () => { try { const v = JSON.parse(localStorage.getItem(QKEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return MEMQ.slice(); } };
-  const qSave = q => { MEMQ = q.slice(); try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) { /* storage off: memory only */ } };
-  const srv = () => window.PAINEL_SERVIDOR || null;
-  const base = () => { const s = srv(); return s && s.url ? String(s.url).replace(/\/+$/, "") : (location.protocol.startsWith("http") ? location.origin : null); };
-  function reloadServerJs() {  // the server may have started on another port: read servidor.js again
-    return new Promise(res => {
-      const el = document.createElement("script");
-      let done = false;
-      const end = () => { if (!done) { done = true; el.remove(); res(); } };
-      el.src = "servidor.js?t=" + Date.now(); el.onload = end; el.onerror = end; setTimeout(end, 3000);
-      document.head.appendChild(el);
-    });
-  }
-  async function call(method, path, body) {
-    const s = srv(), b = base();
-    const off = msg => { const e = new Error(msg); e.rede = true; return e; };
-    if (!s || !s.token || !b) throw off("sem servidor");
+  // Served by scripts/servidor_painel.py (http://127.0.0.1, this computer only). Feito and Desfazer write to
+  // the project at once. The screen is redrawn ONLY after a click of the candidate or a tab change: never by
+  // itself. A heartbeat every 30 s keeps the server on (and redraws nothing); closing the tab turns it off.
+  // Demo (GitHub Pages, no server): the "Feito" only strikes the item on screen.
+  const SRV = window.PAINEL_SERVIDOR && window.PAINEL_SERVIDOR.token && window.PAINEL_SERVIDOR.token !== "__PAINEL" + "_TOKEN__"
+    ? window.PAINEL_SERVIDOR : null;
+  const PAGE_ID = Math.random().toString(36).slice(2, 12);
+  const ENDED = "O painel foi encerrado. Rode /painel para abrir de novo.";
+  let MODE = SRV ? "servidor" : "demo";
+  let DATA = null;
+  let ENCERRADO = false;
+  let beat = null;
+  async function api(path, body) {
     const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 5000);
     let r;
     try {
-      r = await fetch(b + path, { method, cache: "no-store", signal: ctrl.signal, body: body ? JSON.stringify(body) : undefined,
-        headers: Object.assign({ "X-Painel-Token": s.token }, body ? { "Content-Type": "application/json" } : {}) });
-    } catch (e) { throw off("sem conexão"); } finally { clearTimeout(timer); }
+      r = await fetch(path, { method: body ? "POST" : "GET", cache: "no-store", signal: ctrl.signal, body: body ? JSON.stringify(body) : undefined,
+        headers: Object.assign({ "X-Painel-Token": SRV.token }, body ? { "Content-Type": "application/json" } : {}) });
+    } catch (e) {
+      const timeout = e && e.name === "AbortError";
+      const err = new Error(timeout ? "o painel não respondeu em 5 segundos" : "sem conexão com o painel");
+      err.encerrado = !timeout;
+      throw err;
+    } finally { clearTimeout(timer); }
     const out = await r.json().catch(() => null);
-    if (r.status === 403) throw off("acesso negado");
     if (!r.ok || !out || out.ok === false) throw new Error((out && out.erro) || ("erro " + r.status));
     return out;
   }
-  async function callRetry(method, path, body) {  // network error or 403: reload servidor.js once and try again
-    try { return await call(method, path, body); } catch (e) { if (!e.rede) throw e; await reloadServerJs(); return call(method, path, body); }
+  let toastTimer = null;
+  function avisar(msg, kind, retry) {  // one message area, updated in place (never stacked)
+    const el = document.getElementById("aviso");
+    clearTimeout(toastTimer);
+    el.textContent = msg || "";
+    el.hidden = !msg;
+    el.className = "toast" + (kind ? " " + kind : "");
+    if (retry) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn"; b.textContent = "Tentar de novo"; b.setAttribute("data-retry", "");
+      b.addEventListener("click", () => { avisar(""); retry(); });
+      el.append(b);
+    }
+    if (kind === "on") toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
   }
-  const fetchData = () => callRetry("GET", "/data.json");
-  let sending = false;
-  async function sync() {
-    if (MODE === "demo" || sending) return;
-    sending = true;
-    let changed = false;
-    try {
-      if (!qLoad().length) await callRetry("GET", "/api/estado");  // keeps the server alive
-      if (ONLINE !== true) changed = true;
-      ONLINE = true;
-      let q;
-      while ((q = qLoad()).length) {
-        const it = q[0];
-        await callRetry("POST", it.acao === "desfazer" ? "/api/desfazer" : "/api/feito", { id: it.id });
-        qSave(qLoad().filter(x => !(x.id === it.id && x.ts === it.ts && x.acao === it.acao)));
-        ERRO = ""; changed = true;
-      }
-      if (changed) { const d = await fetchData(); if (d && d.pendentes) DATA = d; }
-    } catch (e) {
-      if (e.rede) { if (ONLINE !== false) changed = true; ONLINE = false; } else { ERRO = e.message; changed = true; }
-    } finally { sending = false; }
-    if (changed && DATA) rerender();
+  function encerrado() {  // the server is gone: say it once and stop trying
+    if (beat) { clearInterval(beat); beat = null; }
+    if (ENCERRADO) return;
+    ENCERRADO = true;
+    avisar(ENDED, "bad");
   }
-  let syncBound = false;
-  function initSync() {
-    if (syncBound || MODE === "demo") return;
-    syncBound = true;
-    setInterval(() => { if (qLoad().length) sync(); }, 10000);
-    setInterval(() => { if (document.visibilityState === "visible") sync(); }, 60000);
-    window.addEventListener("focus", sync);
-    window.addEventListener("online", sync);
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sync(); });
-    sync();
+  function heartbeat() {
+    if (!SRV || beat) return;
+    const ping = () => { if (!ENCERRADO) api("/api/estado", { pagina: PAGE_ID }).catch(e => { if (e.encerrado) encerrado(); }); };
+    ping();
+    beat = setInterval(ping, 30000);
+    window.addEventListener("pagehide", () => {
+      if (ENCERRADO) return;
+      try {
+        navigator.sendBeacon("/api/fechou", new Blob([JSON.stringify({ token: SRV.token, pagina: PAGE_ID })], { type: "application/json" }));
+      } catch (e) { /* the server also stops after 3 minutes without heartbeat */ }
+    });
   }
   const rerender = () => { const y = window.scrollY; render(DATA); window.scrollTo({ top: y, behavior: "instant" }); };
-  const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  const LISTS = [["linkedin", "linkedin"], ["emails", "email"], ["decisoes", "decisao"], ["respostas", "resposta"]];
-  function describe(kind, it) {
-    if (kind === "linkedin") return "LinkedIn para " + it.nome;
-    if (kind === "email") return `e-mail para ${it.para} (${it.assunto})`;
-    if (kind === "followup") return "follow-up para " + it.quem;
-    if (kind === "resposta") return "resposta tratada: " + it.texto;
-    return "decisão tomada: " + it.motivo;
+  function act(path, id, el, okMsg) {  // Feito / Desfazer: only this control waits (at most 5 s)
+    if (ENCERRADO) { undoLook(el); avisar(ENDED, "bad"); return; }
+    el.disabled = true;
+    api(path, { id }).then(out => {
+      DATA = out.dados;
+      rerender();
+      avisar(okMsg, "on");
+    }).catch(e => {
+      undoLook(el);
+      if (e.encerrado) return encerrado();
+      avisar("Não consegui gravar: " + e.message + ".", "bad", () => {
+        if (el.type === "checkbox") { el.checked = true; const t = el.closest(".task"); if (t) t.classList.add("done"); }
+        act(path, id, el, okMsg);
+      });
+    });
   }
-  function view(d) {  // the data as the candidate sees it: with the clicks still in the queue applied
-    const q = MODE === "demo" ? [] : qLoad();
-    if (!q.length) return d;
-    const v = JSON.parse(JSON.stringify(d));
-    const p = v.pendentes = v.pendentes || {};
-    p.enviados_hoje = p.enviados_hoje || [];
-    for (const a of q) {
-      if (a.acao !== "feito") { p.enviados_hoje = p.enviados_hoje.filter(x => x.id !== a.id); continue; }
-      let hit = null;
-      for (const [key, kind] of LISTS) {
-        const i = (p[key] || []).findIndex(x => x.id === a.id);
-        if (i >= 0) { hit = [kind, p[key].splice(i, 1)[0]]; break; }
-      }
-      if (!hit) { const i = (v.followups || []).findIndex(f => fuId(f) === a.id); if (i >= 0) hit = ["followup", v.followups.splice(i, 1)[0]]; }
-      if (hit && !p.enviados_hoje.some(x => x.id === a.id)) {
-        const it = hit[1];
-        p.enviados_hoje.push({ id: a.id, tipo: hit[0], data: todayIso(), descricao: describe(hit[0], it), empresa: it.empresa || "",
-          numero: it.numero != null ? it.numero : (it.numeros || [])[0], guardado: true });
-      }
-    }
-    return v;
-  }
-  function click(acao, id) {
-    const q = qLoad();
-    const queued = q.findIndex(x => x.acao === "feito" && x.id === id);
-    if (acao === "desfazer" && queued >= 0) q.splice(queued, 1);  // never left this page: just cancel it
-    else q.push({ acao, id, ts: Date.now() });
-    qSave(q);
-    rerender();
-    sync();
+  function undoLook(el) {
+    el.disabled = false;
+    if (el.type === "checkbox") { el.checked = false; const t = el.closest(".task"); if (t) t.classList.remove("done"); }
   }
 
-  // ---------- copy to clipboard (works from file:// too) ----------
+  // ---------- copy to clipboard ----------
   const COPY = [];
   function copyText(text) {  // -> Promise<boolean>
     if (navigator.clipboard && window.isSecureContext !== false) {
@@ -464,15 +436,7 @@
   const company = it => it.numero != null ? `#${esc(it.numero)}${it.empresa ? " " + esc(it.empresa) : ""}` : esc(it.empresa || "");
   const fuId = f => f.id || ("fu:" + ((f.numeros && f.numeros.length) ? f.numeros.join(",") : f.quem) + ":" + f.data);
   const KIND = { linkedin: "LinkedIn", email: "E-mail", followup: "Follow-up", resposta: "Resposta", decisao: "Decisão" };
-  function statusLine() {
-    if (MODE === "demo") return `<div class="mode-line">Demonstração: o "Feito" só risca o item na tela.</div>`;
-    const n = qLoad().length;
-    const kept = `(${n} ${n === 1 ? "clique guardado" : "cliques guardados"})`;
-    if (ERRO) return `<div id="acao-status" class="mode-line bad" role="status">Não consegui salvar: ${esc(ERRO)}. Vou tentar de novo sozinho.${n ? " " + kept : ""}</div>`;
-    if (n && ONLINE !== true) return `<div id="acao-status" class="mode-line bad" role="status">Marcado. Vou salvar no projeto na próxima vez que o painel for aberto pelo /painel ou pelo robô. ${kept}</div>`;
-    if (ONLINE) return `<div id="acao-status" class="mode-line on" role="status">Marcou como Feito, está registrado.</div>`;
-    return `<div id="acao-status" class="mode-line" role="status" hidden></div>`;
-  }
+  const statusLine = () => MODE === "demo" ? `<div class="mode-line">Demonstração: o "Feito" só risca o item na tela.</div>` : "";
 
   function renderPending(d) {
     const p = d.pendentes;
@@ -494,7 +458,7 @@
       ${statusLine()}
       <div class="card hero"><div class="label">O que falta você fazer, de todas as rodadas</div>
         <p class="big">${totals}</p>
-        <div class="chips">${chip("p-hoje", due.length + replies.length, "Fazer hoje")}${chip("p-linkedin", li.length, "LinkedIn")}${chip("p-emails", em.length, "E-mails")}${chip("p-decisoes", dec.length, "Decisões suas")}${MODE !== "demo" ? chip("p-enviados", sent.length, "Enviados hoje") : ""}</div>
+        <div class="chips">${chip("p-hoje", due.length + replies.length, "Fazer hoje")}${chip("p-linkedin", li.length, "LinkedIn")}${chip("p-emails", em.length, "E-mails")}${chip("p-decisoes", dec.length, "Decisões suas")}${MODE === "servidor" ? chip("p-enviados", sent.length, "Enviados hoje") : ""}</div>
         ${check}
       </div>`;
 
@@ -534,12 +498,12 @@
         <div class="meta">Fonte: ${esc(it.origem)}</div>
         <div class="actions">${extLink(it.link, "Abrir a vaga", "btn primary")}${it.relatorio_html && !d.demo ? `<a class="btn" href="${esc(it.relatorio_html)}" data-relatorio>Relatório da empresa</a>` : ""}</div>`)).join("")}</div>` : nothing;
 
-    // f) Enviados hoje: each one can be undone (a click still in the queue too)
-    if (MODE !== "demo") {
+    // f) Enviados hoje: each one can be undone
+    if (MODE === "servidor") {
       h += `<h2 class="group" id="p-enviados">Enviados hoje <span class="count">${sent.length}</span><small>marcados como Feito hoje</small></h2>`;
       h += sent.length ? `<div class="list">${sent.map((it, i) => `<article class="task sent" data-id="${esc(it.id)}"><div class="n ok">✓</div><div>
           <div class="head"><span class="pill kind-mensagem">${esc(KIND[it.tipo] || it.tipo)}</span><span class="company">${it.numero != null ? "#" + esc(it.numero) + " " : ""}${esc(it.empresa || "")}</span></div>
-          <div class="line">${esc(cap(it.descricao))}</div><div class="meta">${it.guardado ? "Guardado neste navegador: vai para o projeto assim que o painel abrir pelo /painel ou pelo robô" : "Registrado em " + esc(br(it.data))}</div></div>
+          <div class="line">${esc(cap(it.descricao))}</div><div class="meta">Registrado em ${esc(br(it.data))}</div></div>
           <button class="btn" type="button" data-undo="${esc(it.id)}">Desfazer</button></article>`).join("")}</div>`
         : `<div class="empty">Nada marcado como Feito hoje.</div>`;
     }
@@ -559,18 +523,18 @@
       if (MODE === "demo") { art.classList.toggle("done", cb.checked); return; }
       if (!cb.checked) return;
       art.classList.add("done");
-      click("feito", cb.getAttribute("data-done"));
+      act("/api/feito", cb.getAttribute("data-done"), cb, "Marcou como Feito, está registrado.");
     }));
-    app.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click", () => click("desfazer", b.getAttribute("data-undo"))));
+    app.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click",
+      () => act("/api/desfazer", b.getAttribute("data-undo"), b, "Desfeito: o item voltou para os pendentes.")));
     app.querySelectorAll("[data-jump]").forEach(b => b.addEventListener("click", () => {
       const el = document.getElementById(b.getAttribute("data-jump")); if (el) el.scrollIntoView({ behavior: "smooth" });
     }));
   }
 
   // ---------- render ----------
-  function render(raw) {
-    MODE = raw.demo ? "demo" : "real";
-    const d = view(raw);
+  function render(d) {
+    MODE = SRV && !d.demo ? "servidor" : "demo";
     COPY.length = 0;
     const p = d.projeto || {}, r = d.rodada;
     const pct = p.total ? Math.round((p.concluidas / p.total) * 100) : 0;
@@ -682,13 +646,14 @@
     document.getElementById("headline").textContent = "Painel sem dados";
     document.getElementById("app").innerHTML = `<div class="empty" style="margin-top:30px">${msg}</div>`;
   }
-  function start(d) { DATA = d; render(d); initSync(); }
-  if (window.PAINEL_DATA) { start(window.PAINEL_DATA); return; }
-  const src = (new URLSearchParams(location.search).get("data")) || document.querySelector('meta[name="painel-data"]').content;
-  fetch(src, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .catch(() => fetchData())  // opened from disk without data.js: ask the local server
-    .then(d => { if (!d || !d.projeto) throw new Error("sem dados"); start(d); })
-    .catch(() => fail("Não achei os dados do painel. Rode <code>/painel</code> (ou <code>python3 scripts/gerar_painel.py</code>) e abra de novo."));
+  function start(d) { DATA = d; render(d); heartbeat(); }
+  if (SRV) {
+    api("/data.json").then(start).catch(e => fail(e.encerrado ? ENDED : "Não consegui ler os dados do painel: " + esc(e.message) + "."));
+  } else {  // demo (GitHub Pages): fictitious data, only strikes on screen
+    const src = (new URLSearchParams(location.search).get("data")) || document.querySelector('meta[name="painel-data"]').content;
+    fetch(src, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(start)
+      .catch(() => fail("Não achei os dados do painel."));
+  }
 })();
 </script>
 </body>

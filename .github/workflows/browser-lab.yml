@@ -1,11 +1,12 @@
 name: browser-lab
 
-# Permanent test of the REAL panel (fictitious project): A file:// + server, B file:// without server
-# (click queue), C http, D audit of every button (tests/browser_lab/inventario.md).
+# Permanent test of the REAL panel (fictitious project), opened like /painel does (gerar_painel.py):
+# A file:// page, C Feito/Desfazer/report, D audit (tests/browser_lab/inventario.md), E no redraw by itself,
+# F server killed with the page open, G closing the tab turns the server off.
 # QUICK (every push on these paths, default): Ubuntu + Chrome, headless, under 4 minutes.
 # COMPLETE (workflow_dispatch with modo=completo): 11 headed browsers on macOS, Windows and Ubuntu.
 # Any ❌ fails the job. AMBIENTE (the test could not run) is retried once, then only a warning.
-# If scripts/servidor_painel.py does not answer within 10 s, the job stops at once and prints its output.
+# If the panel does not open within 10 s, the job stops at once and prints the server output.
 
 on:
   workflow_dispatch:
@@ -35,7 +36,7 @@ jobs:
   lab:
     name: lab ${{ matrix.so }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.modo == 'completo' && 30 || 10 }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.modo == 'completo' && '{"include":[{"os":"macos-latest","so":"macos","browsers":"safari,chrome,edge,firefox,brave"},{"os":"windows-latest","so":"windows","browsers":"chrome,edge,firefox,brave"},{"os":"ubuntu-latest","so":"ubuntu","browsers":"chrome,firefox"}]}' || '{"include":[{"os":"ubuntu-latest","so":"ubuntu","browsers":"chrome"}]}') }}
