@@ -1,0 +1,250 @@
+{
+  "gerado_em": "2026-11-11 18:30",
+  "demo": true,
+  "projeto": {
+    "total": 80,
+    "concluidas": 30,
+    "faltam": 50,
+    "data_corte": "2026-11-04"
+  },
+  "rodada": {
+    "arquivo": "relatorios/rodada-2026-11-11.md",
+    "titulo": "Rodada de 11/11/2026: 10 empresas (#21 a #30)",
+    "data": "2026-11-11",
+    "rascunhos_novos": {
+      "email": 3,
+      "linkedin": 8
+    },
+    "candidaturas": 1,
+    "empresas": [
+      {
+        "numero": 21,
+        "empresa": "Loja Exemplo 1",
+        "status": "RASCUNHOS_CRIADOS",
+        "motivo": "",
+        "rascunhos": 2
+      },
+      {
+        "numero": 22,
+        "empresa": "Loja Exemplo 2",
+        "status": "CANDIDATURA_ENVIADA",
+        "motivo": "",
+        "rascunhos": 1
+      },
+      {
+        "numero": 23,
+        "empresa": "Agência Exemplo 3",
+        "status": "RASCUNHOS_CRIADOS",
+        "motivo": "",
+        "rascunhos": 3
+      },
+      {
+        "numero": 24,
+        "empresa": "Loja Exemplo 4",
+        "status": "NAO_ELEGIVEL",
+        "motivo": "",
+        "rascunhos": 0
+      },
+      {
+        "numero": 25,
+        "empresa": "Consultoria Exemplo 5",
+        "status": "VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR",
+        "motivo": "",
+        "rascunhos": 1
+      },
+      {
+        "numero": 26,
+        "empresa": "Loja Exemplo 6",
+        "status": "SEM_OPORTUNIDADE",
+        "motivo": "",
+        "rascunhos": 0
+      },
+      {
+        "numero": 27,
+        "empresa": "Agência Exemplo 7",
+        "status": "RASCUNHOS_CRIADOS",
+        "motivo": "",
+        "rascunhos": 2
+      },
+      {
+        "numero": 28,
+        "empresa": "Loja Exemplo 8",
+        "status": "JA_CONTATADA_SEM_NOVA_ACAO",
+        "motivo": "",
+        "rascunhos": 0
+      },
+      {
+        "numero": 29,
+        "empresa": "Loja Exemplo 9",
+        "status": "RASCUNHOS_CRIADOS",
+        "motivo": "",
+        "rascunhos": 2
+      },
+      {
+        "numero": 30,
+        "empresa": "Agência Exemplo 10",
+        "status": "NAO_ELEGIVEL",
+        "motivo": "",
+        "rascunhos": 0
+      }
+    ],
+    "status": {
+      "RASCUNHOS_CRIADOS": 4,
+      "CANDIDATURA_ENVIADA": 1,
+      "NAO_ELEGIVEL": 2,
+      "VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR": 1,
+      "SEM_OPORTUNIDADE": 1,
+      "JA_CONTATADA_SEM_NOVA_ACAO": 1
+    },
+    "o_que_fazer": [
+      {
+        "texto": "Enviar as 8 mensagens de LinkedIn (comece pela Recrutadora Exemplo, da Loja Exemplo 1).",
+        "subitens": []
+      },
+      {
+        "texto": "Enviar os 3 e-mails que estão em rascunhos/email/.",
+        "subitens": []
+      },
+      {
+        "texto": "Decidir se quer se candidatar à vaga de gestão da Consultoria Exemplo 5 (aderência 82%).",
+        "subitens": []
+      },
+      {
+        "texto": "Follow-ups opcionais, só se não houver resposta:",
+        "subitens": [
+          "10/11 — Loja Exemplo 1 (#21)",
+          "18/11 — Agência Exemplo 7 (#27)",
+          "25/11 — Consultoria Exemplo 5 (#25)"
+        ]
+      }
+    ],
+    "followups": [
+      {
+        "quem": "Recrutadora Exemplo (Loja Exemplo 1, #21)",
+        "data": "2026-11-10"
+      },
+      {
+        "quem": "Tech Lead Exemplo (Agência Exemplo 7, #27)",
+        "data": "2026-11-18"
+      },
+      {
+        "quem": "Diretora Exemplo (Consultoria Exemplo 5, #25)",
+        "data": "2026-11-25"
+      }
+    ],
+    "responderam": []
+  },
+  "funil": [
+    {
+      "status": "CANDIDATURA_ENVIADA",
+      "total": 3
+    },
+    {
+      "status": "RASCUNHOS_CRIADOS",
+      "total": 15
+    },
+    {
+      "status": "VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR",
+      "total": 1
+    },
+    {
+      "status": "JA_CONTATADA_SEM_NOVA_ACAO",
+      "total": 2
+    },
+    {
+      "status": "SEM_OPORTUNIDADE",
+      "total": 3
+    },
+    {
+      "status": "NAO_ELEGIVEL",
+      "total": 5
+    },
+    {
+      "status": "PULADA_PELO_CANDIDATO",
+      "total": 1
+    },
+    {
+      "status": "FALTA_PROCESSAR",
+      "total": 50
+    }
+  ],
+  "por_tipo": [
+    {
+      "tipo": "Marca/varejista que usa a tecnologia",
+      "total": 22,
+      "concluidas": 6
+    },
+    {
+      "tipo": "Agência digital multiplataforma",
+      "total": 18,
+      "concluidas": 5
+    },
+    {
+      "tipo": "Empresa com vaga aberta",
+      "total": 14,
+      "concluidas": 10
+    },
+    {
+      "tipo": "Agência especialista",
+      "total": 12,
+      "concluidas": 5
+    },
+    {
+      "tipo": "Consultoria/integradora grande",
+      "total": 9,
+      "concluidas": 3
+    },
+    {
+      "tipo": "Internacional que contrata remoto na região",
+      "total": 3,
+      "concluidas": 1
+    },
+    {
+      "tipo": "Ecossistema (módulo/plataforma sobre a tecnologia)",
+      "total": 2,
+      "concluidas": 0
+    }
+  ],
+  "rodadas": [
+    {
+      "data": "2026-11-04",
+      "empresas": 10
+    },
+    {
+      "data": "2026-11-07",
+      "empresas": 10
+    },
+    {
+      "data": "2026-11-11",
+      "empresas": 10
+    }
+  ],
+  "responderam": [
+    {
+      "texto": "Recrutadora Exemplo (#22 Loja Exemplo 2) pediu o currículo atualizado",
+      "rodada": "2026-11-11"
+    },
+    {
+      "texto": "Gerente Exemplo (#23 Agência Exemplo 3) disse que abre vaga em dezembro",
+      "rodada": "2026-11-11"
+    },
+    {
+      "texto": "Página da Loja Exemplo 9 respondeu que não há vaga para o perfil agora",
+      "rodada": "2026-11-07"
+    }
+  ],
+  "followups": [
+    {
+      "quem": "Recrutadora Exemplo (Loja Exemplo 1, #21)",
+      "data": "2026-11-10"
+    },
+    {
+      "quem": "Tech Lead Exemplo (Agência Exemplo 7, #27)",
+      "data": "2026-11-18"
+    },
+    {
+      "quem": "Diretora Exemplo (Consultoria Exemplo 5, #25)",
+      "data": "2026-11-25"
+    }
+  ]
+}

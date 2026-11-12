@@ -1,0 +1,22 @@
+# Personal data (never commit)
+controle/
+rascunhos/
+curriculos/
+evidencias/
+relatorios/
+cv-configs/
+*.pdf
+*.xlsx
+relatorio-final.md
+relatorio-parcial.md
+perfil.local.md
+painel/data.json
+
+# OS / tooling
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.code-review-graph/
+painel/data.js
+docs/_tmp/

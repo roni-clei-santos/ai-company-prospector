@@ -1,0 +1,17 @@
+{
+  "nome": "Alex Exemplo",
+  "titulo_padrao": "Desenvolvedor Magento / PHP Sênior",
+  "contato": "Curitiba, PR · alex@example.com · linkedin.com/in/alex-exemplo",
+  "experiencias": [
+    {"chave": "agencia1", "cargo": "Desenvolvedor Magento Pleno — Agência Fictícia Um", "datas": "01/2020 – 12/2023",
+     "itens": ["Manutenção de lojas Magento 2 e criação de módulos."]},
+    {"chave": "loja", "cargo": "Desenvolvedor PHP — Loja Exemplo Ltda", "datas": "03/2017 – 12/2019", "itens": []}
+  ],
+  "antes": "",
+  "formacao": ["<b>Sistemas de Informação</b> — Universidade Exemplo (2013–2016)"],
+  "idiomas": "Português nativo · Inglês intermediário",
+  "competencias_padrao": [
+    ["Magento 2", "módulos, temas, integrações"],
+    ["Back-end", "PHP, MySQL, REST"]
+  ]
+}

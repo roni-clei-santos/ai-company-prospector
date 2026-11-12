@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="painel-data" content="data.json">
+<title>Painel da prospecção</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0B1F3A;
+    --navy-2: #12294A;
+    --navy-3: #1B375F;
+    --line: #26446F;
+    --orange: #FF7A1A;
+    --orange-soft: rgba(255, 122, 26, .14);
+    --ink: #F4F7FB;
+    --ink-2: #B9C6D8;
+    --ink-3: #8597B0;
+    --neutral: #5B7090;
+    --ok: #3DD68C;
+    --warn: #FFC145;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--navy); color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--orange); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  header.top { padding: 28px 0 8px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 4px var(--orange-soft); }
+  h1 { margin: 10px 0 4px; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; font-weight: 800; letter-spacing: -.02em; }
+  h1 em { font-style: normal; color: var(--orange); }
+  .sub { color: var(--ink-3); font-size: 13px; }
+  .demo-flag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--orange-soft); color: var(--orange); font-weight: 700; font-size: 11px; letter-spacing: .06em; }
+
+  nav.tabs { position: sticky; top: 0; z-index: 5; background: rgba(11, 31, 58, .92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); margin-top: 18px; }
+  nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  nav.tabs a { flex: none; padding: 14px 14px 12px; color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 14px; border-bottom: 2px solid transparent; }
+  nav.tabs a.on { color: var(--ink); border-bottom-color: var(--orange); }
+
+  section { padding: 34px 0 10px; scroll-margin-top: 56px; }
+  h2 { font-size: 20px; margin: 0 0 16px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  h2 small { color: var(--ink-3); font-weight: 500; font-size: 13px; }
+  h3 { font-size: 14px; margin: 0 0 12px; color: var(--ink-2); font-weight: 600; }
+
+  .grid { display: grid; gap: 14px; }
+  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .two { grid-template-columns: 1fr; } }
+
+  .card { background: var(--navy-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+  .kpi .label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .kpi .value { font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .value.accent { color: var(--orange); }
+  .kpi .hint { color: var(--ink-3); font-size: 12px; }
+
+  .progress { height: 10px; border-radius: 999px; background: var(--navy-3); overflow: hidden; margin: 10px 0 6px; }
+  .progress > span { display: block; height: 100%; background: var(--orange); border-radius: 999px; transition: width .8s ease; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-3); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll-x { overflow-x: auto; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--navy-3); color: var(--ink-2); white-space: nowrap; }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--neutral); }
+  .pill.s-good::before { background: var(--orange); }
+  .pill.s-good { color: var(--ink); }
+
+  ol.todo { margin: 0; padding-left: 20px; }
+  ol.todo li { margin: 0 0 8px; color: var(--ink); }
+  ol.todo li::marker { color: var(--orange); font-weight: 700; }
+  ol.todo ul.sub { margin: 6px 0 0; padding-left: 0; list-style: none; }
+  ol.todo ul.sub li { margin: 0 0 4px; color: var(--ink-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+  ol.todo ul.sub li::before { content: "↳ "; color: var(--orange); }
+
+  .chart { width: 100%; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .bar { fill: var(--orange); transition: opacity .15s; }
+  .chart .bar.muted { fill: var(--neutral); }
+  .chart .bar-bg { fill: var(--navy-3); }
+  .chart .hit { fill: transparent; cursor: default; }
+  .chart .lbl { fill: var(--ink-2); font-size: 12px; font-family: inherit; }
+  .chart .val { fill: var(--ink); font-size: 12px; font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums; }
+  .chart .axis { stroke: var(--line); stroke-width: 1; }
+  .chart g.row:hover .bar { opacity: .82; }
+  .toggle { background: none; border: 1px solid var(--line); color: var(--ink-2); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; float: right; }
+  .toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+  .tbl-view { display: none; }
+  .card.show-table .tbl-view { display: block; }
+  .card.show-table .chart { display: none; }
+
+  #tip { position: fixed; pointer-events: none; z-index: 20; background: #fff; color: #0B1F3A; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.35); opacity: 0; transform: translateY(4px); transition: opacity .1s, transform .1s; }
+  #tip.on { opacity: 1; transform: none; }
+
+  .list { display: grid; gap: 10px; }
+  .item { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 12px; background: var(--navy-2); border: 1px solid var(--line); }
+  .item .badge { flex: none; min-width: 64px; text-align: center; padding: 6px 8px; border-radius: 10px; background: var(--navy-3); font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .item .badge.due { background: var(--orange); color: var(--navy); }
+  .item .meta { color: var(--ink-3); font-size: 12px; }
+  .empty { color: var(--ink-3); font-size: 14px; padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
+
+  footer { margin-top: 40px; padding: 18px 0 26px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+  .pride { height: 4px; background: linear-gradient(90deg, #E40303, #FF8C00, #FFED00, #008026, #24408E, #732982); }
+
+  .fade { animation: fade .5s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+  .loading { padding: 80px 0; text-align: center; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> Prospecção de empresas</div>
+    <h1 id="headline">Carregando o painel…</h1>
+    <div class="sub" id="generated"></div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Seções">
+  <div class="wrap">
+    <a href="#rodada" class="on">Esta rodada</a>
+    <a href="#projeto">Projeto inteiro</a>
+    <a href="#responderam">Responderam</a>
+    <a href="#followups">Follow-ups com data</a>
+  </div>
+</nav>
+
+<main class="wrap" id="app">
+  <div class="loading" id="loading">Lendo os dados…</div>
+</main>
+
+<div id="tip" role="tooltip"></div>
+<footer>
+  <div class="wrap" id="foot">Gerado por <code>scripts/gerar_painel.py</code>. A IA rascunha, você decide e envia.</div>
+</footer>
+<div class="pride" aria-hidden="true"></div>
+
+<script src="data.js" onerror="void 0"></script>
+<script>
+(function () {
+  "use strict";
+
+  const STATUS = {
+    CANDIDATURA_ENVIADA: "Candidatura enviada",
+    RASCUNHOS_CRIADOS: "Rascunhos criados",
+    VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR: "Vaga de gestão (você decide)",
+    JA_CONTATADA_SEM_NOVA_ACAO: "Já contatada",
+    SEM_OPORTUNIDADE: "Sem oportunidade",
+    NAO_ELEGIVEL: "Não elegível",
+    PULADA_PELO_CANDIDATO: "Pulada por você",
+    DESISTENCIA_DO_CANDIDATO: "Você desistiu",
+    PRECISA_DO_CANDIDATO: "Precisa de você",
+    AGUARDANDO_RESPOSTA_CANDIDATO: "Aguardando sua resposta",
+    ERRO: "Erro",
+    FALTA_PROCESSAR: "Falta processar"
+  };
+  const GOOD = new Set(["CANDIDATURA_ENVIADA", "RASCUNHOS_CRIADOS", "VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR"]);
+  const label = s => STATUS[s] || (s || "").replace(/_/g, " ").toLowerCase();
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const br = iso => { if (!iso) return "—"; const [y, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}/${y}`; };
+  const short = iso => { if (!iso) return "—"; const [, m, d] = iso.slice(0, 10).split("-"); return `${d}/${m}`; };
+  // to-do item: plain string (old data.json) or {texto, subitens}
+  const todoItem = t => {
+    if (typeof t === "string") return `<li>${esc(t)}</li>`;
+    const subs = (t.subitens || []).map(x => `<li>${esc(x)}</li>`).join("");
+    return `<li>${esc(t.texto)}${subs ? `<ul class="sub">${subs}</ul>` : ""}</li>`;
+  };
+  const pill = s => `<span class="pill ${GOOD.has(s) ? "s-good" : ""}">${esc(label(s))}</span>`;
+
+  // ---------- tooltip ----------
+  const tip = document.getElementById("tip");
+  function bindTips(root) {
+    root.querySelectorAll("[data-tip]").forEach(el => {
+      el.addEventListener("mousemove", e => {
+        tip.textContent = el.getAttribute("data-tip");
+        tip.classList.add("on");
+        const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+        tip.style.left = x + "px"; tip.style.top = (e.clientY - 36) + "px";
+      });
+      el.addEventListener("mouseleave", () => tip.classList.remove("on"));
+    });
+  }
+
+  // ---------- horizontal bars (single series) ----------
+  function hbars(rows, opts) {
+    opts = opts || {};
+    const W = Math.min(560, Math.max(300, window.innerWidth - 72));
+    const labelW = Math.min(opts.labelW || 190, Math.round(W * 0.42)), valW = 44, rowH = 30, barH = 14;
+    const max = Math.max(1, ...rows.map(r => opts.max || r.value));
+    const plotW = W - labelW - valW;
+    const H = rows.length * rowH + 4;
+    let g = "";
+    rows.forEach((r, i) => {
+      const y = i * rowH + 4, w = Math.max(r.value ? 4 : 0, (r.value / max) * plotW);
+      const maxCh = Math.floor((labelW - 12) / 6.4); const lbl = r.label.length > maxCh ? r.label.slice(0, maxCh - 1) + "…" : r.label;
+      g += `<g class="row" data-tip="${esc(r.tip || r.label + ": " + r.value)}">
+        <rect class="hit" x="0" y="${y - 6}" width="${W}" height="${rowH}"></rect>
+        <text class="lbl" x="${labelW - 10}" y="${y + barH - 2}" text-anchor="end">${esc(lbl)}</text>
+        ${opts.track ? `<rect class="bar-bg" x="${labelW}" y="${y}" width="${plotW}" height="${barH}" rx="4"></rect>` : ""}
+        <rect class="bar ${r.muted ? "muted" : ""}" x="${labelW}" y="${y}" width="${w}" height="${barH}" rx="4"></rect>
+        <text class="val" x="${labelW + w + 8}" y="${y + barH - 2}">${esc(r.display != null ? r.display : r.value)}</text>
+      </g>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria || "")}">${g}</svg>`;
+  }
+
+  // ---------- columns over time ----------
+  function columns(rows, aria) {
+    const W = 1100, H = 200, padB = 28, padT = 22, gap = 2;
+    const n = Math.max(rows.length, 1);
+    const max = Math.max(1, ...rows.map(r => r.value));
+    const slot = W / n, bw = Math.min(48, slot * 0.6);
+    let g = `<line class="axis" x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}"></line>`;
+    rows.forEach((r, i) => {
+      const h = Math.max(4, (r.value / max) * (H - padB - padT));
+      const x = i * slot + (slot - bw) / 2, y = H - padB - h;
+      g += `<g class="row" data-tip="${esc(br(r.date) + ": " + r.value + " empresas")}">
+        <rect class="hit" x="${i * slot}" y="0" width="${slot - gap}" height="${H}"></rect>
+        <path class="bar" d="M${x},${H - padB} V${y + 4} q0,-4 4,-4 H${x + bw - 4} q4,0 4,4 V${H - padB} Z"></path>
+        <text class="val" x="${x + bw / 2}" y="${y - 6}" text-anchor="middle">${r.value}</text>
+        <text class="lbl" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${esc(short(r.date))}</text>
+      </g>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${g}</svg>`;
+  }
+
+  function tableView(head, rows) {
+    return `<div class="tbl-view scroll-x"><table><thead><tr>${head.map((h, i) => `<th class="${i ? "num" : ""}">${esc(h)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? "num" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  }
+
+  function chartCard(title, svg, head, rows) {
+    return `<div class="card"><button class="toggle" type="button">Ver tabela</button><h3>${esc(title)}</h3>
+      <div class="chart">${svg}</div>${tableView(head, rows)}</div>`;
+  }
+
+  // ---------- render ----------
+  function render(d) {
+    const p = d.projeto || {}, r = d.rodada;
+    const pct = p.total ? Math.round((p.concluidas / p.total) * 100) : 0;
+    document.title = (d.demo ? "Demo · " : "") + "Painel da prospecção";
+    document.getElementById("headline").innerHTML = `<em>${p.concluidas || 0}</em> de ${p.total || 0} empresas concluídas`;
+    document.getElementById("generated").innerHTML = `Atualizado em ${esc(br(d.gerado_em))} ${esc((d.gerado_em || "").slice(11))}` +
+      (p.data_corte ? ` · envios conferidos desde ${esc(br(p.data_corte))}` : "") + (d.demo ? `<span class="demo-flag">DADOS FICTÍCIOS</span>` : "");
+
+    let html = "";
+
+    // Esta rodada
+    html += `<section id="rodada" class="fade"><h2>Esta rodada ${r ? `<small>${esc(br(r.data))} · ${esc(r.arquivo)}</small>` : ""}</h2>`;
+    if (!r) {
+      html += `<div class="empty">Ainda não há rodada. Rode <code>/next-companies</code>.</div>`;
+    } else {
+      const total = r.empresas.length;
+      const drafts = (r.rascunhos_novos.email || 0) + (r.rascunhos_novos.linkedin || 0);
+      html += `<div class="grid kpis">
+        <div class="card kpi"><div class="label">Empresas</div><div class="value">${total}</div><div class="hint">processadas nesta rodada</div></div>
+        <div class="card kpi"><div class="label">Rascunhos novos</div><div class="value accent">${drafts}</div><div class="hint">${r.rascunhos_novos.linkedin} LinkedIn · ${r.rascunhos_novos.email} e-mail</div></div>
+        <div class="card kpi"><div class="label">Candidaturas</div><div class="value">${r.candidaturas}</div><div class="hint">enviadas com confirmação</div></div>
+        <div class="card kpi"><div class="label">Follow-ups</div><div class="value">${(d.followups || []).length}</div><div class="hint">com data marcada</div></div>
+      </div>`;
+      html += `<div class="grid two" style="margin-top:14px">
+        <div class="card"><h3>O que fazer agora</h3>${r.o_que_fazer.length ? `<ol class="todo">${r.o_que_fazer.map(todoItem).join("")}</ol>` : `<div class="empty">Nada pendente nesta rodada.</div>`}</div>
+        <div class="card"><h3>Status desta rodada</h3>${Object.keys(r.status).length ? '<div class="chart">' + hbars(Object.entries(r.status).sort((a, b) => b[1] - a[1]).map(([s, n]) => ({ label: label(s), value: n })), { aria: "Status desta rodada", labelW: 170 }) + '</div>' : `<div class="empty">Sem status.</div>`}</div>
+      </div>`;
+      html += `<div class="card" style="margin-top:14px"><h3>Empresas da rodada</h3><div class="scroll-x"><table>
+        <thead><tr><th>#</th><th>Empresa</th><th>Status</th><th class="num">Rascunhos</th></tr></thead><tbody>
+        ${r.empresas.map(c => `<tr><td>${c.numero}</td><td>${esc(c.empresa)}</td><td>${pill(c.status)}</td><td class="num">${c.rascunhos}</td></tr>`).join("")}
+        </tbody></table></div></div>`;
+    }
+    html += `</section>`;
+
+    // Projeto inteiro
+    const funnel = (d.funil || []).map(f => ({ label: label(f.status), value: f.total, muted: f.status === "FALTA_PROCESSAR" }));
+    const types = (d.por_tipo || []).map(t => ({ label: t.tipo, value: t.concluidas, display: `${t.concluidas}/${t.total}`, tip: `${t.tipo}: ${t.concluidas} de ${t.total} concluídas`, max: 0 }));
+    const typeMax = Math.max(1, ...(d.por_tipo || []).map(t => t.total));
+    const rounds = (d.rodadas || []).map(x => ({ date: x.data, value: x.empresas }));
+    html += `<section id="projeto" class="fade"><h2>Projeto inteiro <small>${pct}% concluído</small></h2>
+      <div class="card"><div class="kpi"><div class="label">Progresso</div></div>
+        <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+        <div class="sub">${p.concluidas} concluídas · ${p.faltam} faltam · ${p.total} na planilha</div></div>
+      <div class="grid two" style="margin-top:14px">
+        ${chartCard("Funil por status", hbars(funnel, { aria: "Empresas por status" }), ["Status", "Empresas"], (d.funil || []).map(f => [label(f.status), f.total]))}
+        ${chartCard("Empresas por tipo (concluídas / total)", hbars(types.map(t => Object.assign(t, { max: typeMax })), { aria: "Empresas por tipo", track: true, max: typeMax }), ["Tipo", "Concluídas", "Total"], (d.por_tipo || []).map(t => [t.tipo, t.concluidas, t.total]))}
+      </div>
+      <div style="margin-top:14px">${chartCard("Empresas registradas por dia", columns(rounds, "Empresas registradas por dia"), ["Dia", "Empresas"], rounds.map(x => [br(x.date), x.value]))}</div>
+    </section>`;
+
+    // Responderam
+    const replied = d.responderam || [];
+    html += `<section id="responderam" class="fade"><h2>Responderam <small>${replied.length} nas últimas rodadas</small></h2>
+      ${replied.length ? `<div class="list">${replied.map(x => `<div class="item"><div class="badge">${esc(short(x.rodada))}</div><div>${esc(x.texto)}<div class="meta">visto na conferência da rodada de ${esc(br(x.rodada))}</div></div></div>`).join("")}</div>`
+        : `<div class="empty">Ninguém respondeu ainda. As respostas aparecem aqui quando a rodada confere suas mensagens.</div>`}
+    </section>`;
+
+    // Follow-ups
+    const today = new Date().toISOString().slice(0, 10);
+    const fus = d.followups || [];
+    html += `<section id="followups" class="fade"><h2>Follow-ups com data <small>só se não houver resposta</small></h2>
+      ${fus.length ? `<div class="list">${fus.map(f => { const due = f.data <= today; return `<div class="item"><div class="badge ${due ? "due" : ""}">${esc(short(f.data))}</div><div>${esc(f.quem)}<div class="meta">${due ? "já pode mandar" : "a partir de " + esc(br(f.data))}</div></div></div>`; }).join("")}</div>`
+        : `<div class="empty">Nenhum follow-up marcado.</div>`}
+    </section>`;
+
+    const app = document.getElementById("app");
+    app.innerHTML = html;
+    app.querySelectorAll(".toggle").forEach(b => b.addEventListener("click", () => {
+      const card = b.closest(".card"); card.classList.toggle("show-table");
+      b.textContent = card.classList.contains("show-table") ? "Ver gráfico" : "Ver tabela";
+    }));
+    bindTips(app);
+    spy();
+    tour();
+  }
+
+  // ---------- nav highlight ----------
+  function spy() {
+    const links = [...document.querySelectorAll("nav.tabs a")];
+    const sections = links.map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
+    const set = id => links.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + id));
+    const update = () => {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) return set(sections[sections.length - 1].id);
+      const line = window.innerHeight * 0.35;
+      let current = sections[0];
+      sections.forEach(sec => { if (sec.getBoundingClientRect().top <= line) current = sec; });
+      set(current.id);
+    };
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+  }
+
+  // ---------- ?tour=1 cycles through the sections (used to record the demo GIF) ----------
+  function tour() {
+    if (!/[?&]tour=1/.test(location.search)) return;
+    const ids = ["rodada", "projeto", "responderam", "followups"];
+    let i = 0;
+    setInterval(() => { i = (i + 1) % ids.length; document.getElementById(ids[i]).scrollIntoView({ behavior: "smooth" }); }, 2600);
+  }
+
+  // ---------- load ----------
+  function fail(msg) {
+    document.getElementById("headline").textContent = "Painel sem dados";
+    document.getElementById("app").innerHTML = `<div class="empty" style="margin-top:30px">${msg}</div>`;
+  }
+  if (window.PAINEL_DATA) { render(window.PAINEL_DATA); return; }
+  const src = (new URLSearchParams(location.search).get("data")) || document.querySelector('meta[name="painel-data"]').content;
+  fetch(src, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render)
+    .catch(() => fail("Não achei os dados do painel. Rode <code>python3 scripts/gerar_painel.py</code> na pasta do projeto e abra de novo."));
+})();
+</script>
+</body>
+</html>
