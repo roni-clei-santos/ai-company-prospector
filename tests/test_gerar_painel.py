@@ -71,7 +71,7 @@ def make_project(tmp_path, monkeypatch, round_text):
         ws.append([n, f"Loja Exemplo {n}", "Marca/varejista que usa a tecnologia", "RASCUNHOS_CRIADOS" if n <= 3 else None])
     wb.save(tmp_path / "relatorio-final.xlsx")
     (tmp_path / "relatorios" / "rodada-2026-11-11.md").write_text(round_text, encoding="utf-8")
-    gerar_painel.main()
+    gerar_painel.main(["--no-open"])
     return json.loads((tmp_path / "painel" / "data.json").read_text(encoding="utf-8"))
 
 
@@ -119,3 +119,12 @@ def test_followup_label_formats():
     assert lab({"quem": "Tech Lead Exemplo (Agência Exemplo 7, #27)", "data": "2026-11-18"}) == "18/11 — Agência Exemplo 7 (#27)"
     assert lab({"quem": "Loja Exemplo 9 (#9)", "data": "2026-11-20"}) == "20/11 — Loja Exemplo 9 (#9)"
     assert lab({"quem": "Alguém sem número", "data": "2026-12-01"}) == "01/12 — Alguém sem número"
+
+
+def test_opens_browser_unless_no_open(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda uri: calls.append(uri) or True)
+    make_project(tmp_path, monkeypatch, WITH_FOLLOWUPS)  # uses --no-open
+    assert calls == []
+    gerar_painel.main([])
+    assert len(calls) == 1 and calls[0].startswith("file://") and calls[0].endswith("/painel/index.html")

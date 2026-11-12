@@ -3,17 +3,19 @@
 
 Reads: controle/progresso.json, relatorios/rodada-*.md, relatorio-final.xlsx (or the company sheet).
 Writes: painel/data.json and painel/data.js (same data as `window.PAINEL_DATA = ...`, so the
-panel also works when opened straight from disk with `open painel/index.html`).
+panel also works when opened straight from disk, as a file:// page).
 Both outputs are personal data and are gitignored.
 
-Usage (from the project folder):
-  python3 scripts/gerar_painel.py          build painel/data.json from your project
-  python3 scripts/gerar_painel.py --demo   copy the panel + painel/demo-data.json to docs/demo/ (GitHub Pages)
+Usage (from the project folder; on Windows use `py -3` instead of `python3`):
+  python3 scripts/gerar_painel.py             build painel/data.json and open painel/index.html in the browser
+  python3 scripts/gerar_painel.py --no-open   build painel/data.json only (does not open the browser)
+  python3 scripts/gerar_painel.py --demo      copy the panel + painel/demo-data.json to docs/demo/ (GitHub Pages)
 """
 import collections
 import json
 import re
 import sys
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -226,8 +228,17 @@ def build_demo():
     print("docs/demo/index.html + docs/demo/demo-data.json")
 
 
-def main():
-    if "--demo" in sys.argv[1:]:
+def open_panel(index_html):
+    """Open the panel in the default browser (macOS, Linux and Windows). Returns True if it opened."""
+    try:
+        return bool(webbrowser.open(Path(index_html).resolve().as_uri()))
+    except webbrowser.Error:
+        return False
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    if "--demo" in args:
         build_demo()
         return
     root = project_root()
@@ -240,6 +251,13 @@ def main():
     p = data["projeto"]
     print(f"painel/data.json: {p['concluidas']} de {p['total']} empresas; "
           f"rodada: {data['rodada']['arquivo'] if data['rodada'] else 'nenhuma'}")
+    if "--no-open" in args:
+        return
+    index_html = out / "index.html"
+    if index_html.exists() and open_panel(index_html):
+        print("Painel aberto no navegador: painel/index.html")
+    else:
+        print(f"Abra no navegador: {index_html.resolve().as_uri()}")
 
 
 if __name__ == "__main__":

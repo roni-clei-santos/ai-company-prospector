@@ -2,10 +2,12 @@
 
 [← Rodada](05-rodada.md) · [Próximo: FAQ e erros →](07-faq-e-erros.md)
 
-Ao fim de cada rodada, o `/next-companies` roda `python3 scripts/gerar_painel.py` e abre `painel/index.html`. Para abrir de novo quando quiser:
+Ao fim de cada rodada, o `/next-companies` roda `python3 scripts/gerar_painel.py`, que grava os dados e abre `painel/index.html` no navegador padrão (macOS, Linux e Windows). Para abrir de novo quando quiser:
 
 ```bash
-python3 scripts/gerar_painel.py && open painel/index.html
+python3 scripts/gerar_painel.py             # macOS e Linux
+py -3 scripts\gerar_painel.py               # Windows
+python3 scripts/gerar_painel.py --no-open   # só atualiza os dados, sem abrir o navegador
 ```
 
 O script lê `controle/progresso.json`, `relatorios/rodada-*.md` e `relatorio-final.xlsx` e grava `painel/data.json` + `painel/data.js` (dados pessoais, fora do git). O painel funciona direto do disco, sem servidor.

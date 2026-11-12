@@ -20,3 +20,6 @@ __pycache__/
 .code-review-graph/
 painel/data.js
 docs/_tmp/
+
+# Local alias of PROMPT-prospeccao.md (symlink; not portable to Windows)
+PROMPT-prospeccao-magento.md
