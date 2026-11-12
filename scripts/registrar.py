@@ -5,11 +5,15 @@ Usage (run from the project folder):
   python3 scripts/registrar.py <company.json>
   python3 scripts/registrar.py --data-corte 2026-11-09
   python3 scripts/registrar.py --historico "note text" [--sessao N]
+  python3 scripts/registrar.py --nao-contatar "Full Name" [--empresa X] [--email E] [--linkedin URL] [--motivo M]
 
 company.json keys: numero, empresa, status, data (optional, ISO; default today) and the report
 columns: contato_anterior, canais, vagas, candidaturas, rascunhos, motivo, pendencias, evidencias.
 The status must be one of the official names (PROMPT section 12). A date written inside the
 status text, e.g. "PULADA_PELO_CANDIDATO (10/11/2026)", is moved to the `data` field.
+
+NAO_CONTATAR: a company with this status is never changed to another status (and never gets a new
+draft) unless --forcar is given. --nao-contatar adds a PERSON to progresso.json > nao_contatar.
 """
 import argparse
 import json
@@ -21,8 +25,8 @@ import openpyxl
 from openpyxl.styles import Alignment, Font
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import (OFFICIAL_STATUSES, backup_file, find_company_sheet, project_root,  # noqa: E402
-                    read_profile_fields, save_workbook_atomic, split_status, write_json_atomic)
+from common import (DO_NOT_CONTACT, OFFICIAL_STATUSES, backup_file, find_company_sheet,  # noqa: E402
+                    mentions_person, normalize_url, project_root, read_profile_fields, save_workbook_atomic, split_status, write_json_atomic)
 
 # (json key, column header, accepted legacy header prefixes)
 COLUMNS = [
@@ -95,12 +99,16 @@ def column_map(ws):
     return result
 
 
-def record_company(data):
+def record_company(data, force=False):
     _, output_path, progress_path = paths()
     num = int(data["numero"])
     status, date_in_text = split_status(data.get("status"))
     if status not in OFFICIAL_STATUSES:
         sys.exit(f"Invalid status {data.get('status')!r}. Allowed: {', '.join(OFFICIAL_STATUSES)}")
+    if progress_path.exists() and not force:
+        current = next((e for e in load_progress(progress_path)["empresas"] if int(e["numero"]) == num), None)
+        if current and split_status(current.get("status"))[0] == DO_NOT_CONTACT and status != DO_NOT_CONTACT:
+            sys.exit(f"#{num} is {DO_NOT_CONTACT}: not changed. Only the candidate can lift it (--forcar).")
     status_date = data.get("data") or date_in_text or date.today().isoformat()
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -151,17 +159,48 @@ def add_history(note, session=None):
     print("historico +1")
 
 
+def add_do_not_contact(name, company=None, email=None, linkedin=None, reason=None):
+    """Add a person to progresso.json > nao_contatar (no duplicates by e-mail, LinkedIn or name+company)."""
+    if not (name or email or linkedin):
+        sys.exit("--nao-contatar needs a name, --email or --linkedin")
+    _, _, progress_path = paths()
+    prog = load_progress(progress_path)
+    people = prog.setdefault("nao_contatar", [])
+    entry = {k: v for k, v in {"nome": name, "empresa": company, "email": (email or "").strip().lower() or None,
+                               "linkedin_url": normalize_url(linkedin) or None, "motivo": reason}.items() if v}
+    probe = " ".join(str(entry.get(k, "")) for k in ("nome", "email", "linkedin_url"))
+    for p in people:
+        same_company = not company or not p.get("empresa") or p["empresa"].lower() == company.lower()
+        if same_company and mentions_person(probe, p):
+            print(f"{DO_NOT_CONTACT}: {p.get('nome') or p.get('email') or p.get('linkedin_url')} already listed")
+            return
+    entry["em"] = date.today().isoformat()
+    people.append(entry)
+    backup_file(progress_path)
+    write_json_atomic(progress_path, prog)
+    print(f"{DO_NOT_CONTACT}: {name or email or linkedin} registrado")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Record a company in progresso.json and relatorio-final.xlsx")
     ap.add_argument("arquivo", nargs="?", help="company JSON file")
     ap.add_argument("--data-corte", help="set progresso.json > data_corte (YYYY-MM-DD)")
     ap.add_argument("--historico", help="append a note to progresso.json > historico")
     ap.add_argument("--sessao", help="session number for --historico")
+    ap.add_argument("--forcar", action="store_true", help="allow changing a company that is NAO_CONTATAR")
+    ap.add_argument("--nao-contatar", metavar="NOME", help="add a person to progresso.json > nao_contatar")
+    ap.add_argument("--empresa", help="company of the --nao-contatar person")
+    ap.add_argument("--email", help="e-mail of the --nao-contatar person")
+    ap.add_argument("--linkedin", help="LinkedIn URL of the --nao-contatar person")
+    ap.add_argument("--motivo", help="reason for --nao-contatar")
     args = ap.parse_args(argv)
-    if not (args.arquivo or args.data_corte or args.historico):
+    person = args.nao_contatar or args.email or args.linkedin
+    if not (args.arquivo or args.data_corte or args.historico or person):
         ap.error("nothing to do")
     if args.arquivo:
-        record_company(json.loads(Path(args.arquivo).read_text(encoding="utf-8")))
+        record_company(json.loads(Path(args.arquivo).read_text(encoding="utf-8")), force=args.forcar)
+    if person:
+        add_do_not_contact(args.nao_contatar, args.empresa, args.email, args.linkedin, args.motivo)
     if args.data_corte:
         set_cutoff(args.data_corte)
     if args.historico:

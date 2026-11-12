@@ -7,6 +7,7 @@ import json
 import os
 import re
 import tempfile
+import unicodedata
 from pathlib import Path
 
 OFFICIAL_STATUSES = [
@@ -21,7 +22,11 @@ OFFICIAL_STATUSES = [
     "AGUARDANDO_RESPOSTA_CANDIDATO",
     "ERRO",
     "VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR",
+    "NAO_CONTATAR",
 ]
+
+# Status for a company (or, in progresso.json > nao_contatar, a person) that asked not to be contacted.
+DO_NOT_CONTACT = "NAO_CONTATAR"
 
 # Legacy status names (older versions of the project used the candidate's first name).
 # Matched by prefix/suffix so no personal name has to live in the code.
@@ -34,6 +39,53 @@ _LEGACY_PATTERNS = [
 ]
 
 _DATE_IN_TEXT = re.compile(r"\(?\s*(\d{2})/(\d{2})/(\d{4})\s*\)?")
+
+
+def _fold(text):
+    """Lowercase, strip accents and collapse spaces (for name matching)."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return " ".join(text.lower().split())
+
+
+def normalize_url(url):
+    """'https://www.linkedin.com/in/Alex-Exemplo/' -> 'linkedin.com/in/alex-exemplo'."""
+    u = str(url or "").strip().lower()
+    u = re.sub(r"^https?://", "", u)
+    u = re.sub(r"^(www\.|[a-z]{2}\.)(?=linkedin\.com)", "", u)
+    return u.split("?")[0].split("#")[0].rstrip("/")
+
+
+def do_not_contact(progress):
+    """Return (company_numbers, people) marked NAO_CONTATAR in a loaded progresso.json.
+
+    company_numbers: set of ints (companies whose status is NAO_CONTATAR).
+    people: list of dicts from progresso.json > nao_contatar (nome, empresa, email, linkedin_url, ...).
+    """
+    numbers = {int(e["numero"]) for e in progress.get("empresas", [])
+               if split_status(e.get("status"))[0] == DO_NOT_CONTACT}
+    return numbers, list(progress.get("nao_contatar", []))
+
+
+def mentions_person(text, person):
+    """True if `text` names `person` by e-mail, LinkedIn URL or full name (2+ words, accent-insensitive)."""
+    low = str(text or "").lower()
+    email = str(person.get("email") or "").strip().lower()
+    if email and email in low:
+        return True
+    url = normalize_url(person.get("linkedin_url"))
+    if url and re.search(re.escape(url) + r"(?![\w-])", normalize_url_text(low)):
+        return True
+    name = _fold(person.get("nome"))
+    if len(name.split()) >= 2:
+        return re.search(r"(?<!\w)" + re.escape(name) + r"(?!\w)", _fold(text)) is not None
+    return False
+
+
+def normalize_url_text(text):
+    """Normalize every LinkedIn URL inside free text so it can be compared with normalize_url()."""
+    return re.sub(r"(?:https?://)?(?:www\.|[a-z]{2}\.)?linkedin\.com/[^\s)>\]\"']+",
+                  lambda m: normalize_url(m.group(0)), text)
 
 
 def project_root():

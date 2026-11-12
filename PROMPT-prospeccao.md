@@ -33,6 +33,7 @@ Leia este documento inteiro e o PERFIL antes de fazer qualquer coisa.
   - `scripts/registrar.py <arquivo.json>`: grava UMA empresa concluída no `progresso.json` e no `relatorio-final.xlsx`. É o ÚNICO jeito permitido de gravar empresa nesses dois arquivos.
   - `scripts/gerar_cv.py <config.json> <saida.pdf>`: gera currículo ajustado (seção 7.2).
   - `scripts/checar_notas.py`: confere as notas de convite do LinkedIn (seção 9.2).
+  - `scripts/checar_nao_contatar.py`: confere que nenhum rascunho pendente vai para pessoa ou empresa marcada `NAO_CONTATAR` (seção 5.4).
   - `scripts/gerar_painel.py`: gera o painel da rodada (`painel/index.html`).
 - Para ler e escrever `.xlsx` e gerar PDF, use Python (openpyxl e reportlab). Instale o que faltar com `pip3 install --user <pacote>`.
 
@@ -125,6 +126,12 @@ Não faça mais nenhuma pesquisa geral. O resto é por empresa.
 - **Já mandou e-mail para um endereço:** não crie rascunho para o MESMO endereço com o mesmo assunto. Se fizer sentido um follow-up (último contato há mais de 15 dias e sem resposta), crie o rascunho e marque no relatório como "FOLLOW-UP".
 - Salve tudo em `controle/historico-contatos.md`, uma seção por empresa, com data e fonte de cada contato.
 
+### 5.4 Quem pediu para não ser contatado (`NAO_CONTATAR`)
+- **Pessoa:** quando alguém pedir para não receber contato (resposta no LinkedIn, no e-mail ou recado do CANDIDATO), registre: `python3 scripts/registrar.py --nao-contatar "<nome>" --empresa "<empresa>" [--email <e-mail>] [--linkedin <url do perfil>] --motivo "<como pediu e quando>"`. A pessoa vai para `progresso.json > nao_contatar`.
+- **Empresa:** quando a empresa inteira pedir, regrave-a com o status `NAO_CONTATAR` (seção 12) pelo `scripts/registrar.py`, com o pedido no campo `motivo`. O script não deixa trocar esse status depois (só o CANDIDATO libera, com `--forcar`).
+- Pessoa ou empresa `NAO_CONTATAR` NUNCA recebe rascunho novo (e-mail, LinkedIn, follow-up ou retomada), nem candidatura nova. Antes de criar qualquer rascunho, confira a lista `progresso.json > nao_contatar` (por nome, e-mail e URL do perfil).
+- Rascunhos pendentes para quem foi marcado depois: marque `NÃO ENVIAR` no arquivo e avise o CANDIDATO. Ao fim da rodada, rode `python3 scripts/checar_nao_contatar.py` e corrija tudo o que ele apontar.
+
 ---
 
 ## 6. Trabalho por empresa (todas, uma por uma, cada uma do começo ao fim)
@@ -136,6 +143,8 @@ Não faça mais nenhuma pesquisa geral. O resto é por empresa.
 4. Por último: "Prospecção direta (loja)".
 
 Empresas em `empresas_excluidas` do PERFIL: registre direto como `PULADA_PELO_CANDIDATO`, sem pesquisa.
+
+Empresas com status `NAO_CONTATAR` já estão decididas: não pesquise nem crie nada para elas (seção 5.4).
 
 Ciclo de CADA empresa, nesta ordem e sem pular etapas:
 1. Histórico de contatos dela (seção 5.1).
@@ -297,6 +306,7 @@ Para CADA vaga aberta da empresa que tenha relação com tecnologia ou e-commerc
 - `AGUARDANDO_RESPOSTA_CANDIDATO`: depende de uma resposta dele (pergunta registrada).
 - `ERRO`: falha técnica que impediu o trabalho (com a mensagem).
 - `VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR`: a empresa tem vaga de gestão (seção 6.2-B, item 7) com aderência ≥ 75% e sem filtro, que não foi candidatada automaticamente; a vaga fica listada com link para o CANDIDATO decidir.
+- `NAO_CONTATAR`: a empresa pediu para não ser contatada (seção 5.4). Nunca recebe rascunho nem candidatura nova. Pessoas com o mesmo pedido ficam em `progresso.json > nao_contatar`.
 
 O status é SÓ o nome acima, sem data nem comentário dentro do texto. A data vai no campo `data` (ISO, `AAAA-MM-DD`).
 
@@ -313,6 +323,9 @@ Formato:
   ],
   "historico": [
     {"em": "AAAA-MM-DD", "nota": "..."}
+  ],
+  "nao_contatar": [
+    {"nome": "...", "empresa": "...", "email": "...", "linkedin_url": "...", "motivo": "...", "em": "AAAA-MM-DD"}
   ]
 }
 ```

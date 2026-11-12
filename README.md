@@ -209,6 +209,26 @@ Seu perfil, planilhas, rascunhos, relatórios e currículos ficam só no seu com
 Instalador e testes automáticos: ✅. O `install.ps1` roda no PowerShell 5.1 e 7, copia as skills (o Windows exige permissão especial para links simbólicos) e é testado a cada push no GitHub Actions (`windows-latest`), com os testes e o painel. Fluxo completo com Claude Code + LinkedIn: ainda não validado por um usuário. Usa Windows? Rode o fluxo completo e [conte como foi numa issue](https://github.com/roni-clei-santos/ai-company-prospector/issues/new?template=relato-de-sistema.md). Isso ajuda muito o projeto.
 </details>
 
+## Privacidade e LGPD
+
+**O que o robô guarda.** Nome, cargo, empresa, link do perfil e, quando houver, o e-mail profissional de recrutadores e contatos de RH. Pela LGPD, isso é dado pessoal, mesmo quando vem de um perfil público.
+
+**Onde fica.** Só no computador de quem usa, nas pastas e arquivos que o `.gitignore` deixa fora do git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, as planilhas `.xlsx`, os `relatorio-*.md` e o `painel/data.json`. Nada vai para um servidor do projeto, porque o projeto não tem servidor.
+
+**Quem é responsável.** Quem usa o robô passa a ser o responsável por esses dados.
+
+**Boas práticas.**
+- Use os dados só para contato profissional.
+- Não compartilhe nem publique as pastas de dados.
+- Apague o que não precisar mais. Na pasta do projeto:
+  - macOS e Linux: `rm -rf controle rascunhos relatorios evidencias`
+  - Windows (PowerShell): `Remove-Item -Recurse -Force controle, rascunhos, relatorios, evidencias`
+- Atenda quem pedir para não ser contatado: registre a pessoa como `NAO_CONTATAR` no `controle/progresso.json` com `python3 scripts/registrar.py --nao-contatar "Nome" --empresa "Empresa"` (no Windows, `py -3` no lugar de `python3`; ou peça ao Claude na rodada). Ela não recebe mais rascunhos.
+
+**IA.** O conteúdo processado passa pelo Claude, conforme os termos e a [política de privacidade da Anthropic](https://www.anthropic.com/legal/privacy).
+
+Isto não é aconselhamento jurídico.
+
 ## Aviso
 
 Os termos do LinkedIn restringem automação. Este projeto só lê, no navegador logado da própria pessoa, telas que ela mesma veria. Use sob sua responsabilidade.

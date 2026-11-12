@@ -209,6 +209,26 @@ Your profile, spreadsheets, drafts, reports and résumés stay on your computer 
 Installer and automated tests: ✅. `install.ps1` runs on PowerShell 5.1 and 7, copies the skills (Windows needs special permission for symbolic links) and is tested on every push with GitHub Actions (`windows-latest`), with the tests and the dashboard. Full flow with Claude Code + LinkedIn: not yet validated by a user. On Windows? Run the full flow and [tell us how it went in an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues/new?template=relato-de-sistema.md). It helps the project a lot.
 </details>
 
+## Privacy and data protection (LGPD)
+
+**What the robot stores.** Name, job title, company, profile link and, when available, the work e-mail of recruiters and HR contacts. Under Brazil's LGPD (and laws like the GDPR), this is personal data, even when it comes from a public profile.
+
+**Where it lives.** Only on the user's computer, in the folders and files that `.gitignore` keeps out of git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, the `.xlsx` spreadsheets, the `relatorio-*.md` files and `painel/data.json`. Nothing goes to a project server, because the project has no server.
+
+**Who is responsible.** Whoever uses the robot becomes responsible for this data.
+
+**Good practices.**
+- Use the data only for professional contact.
+- Do not share or publish the data folders.
+- Delete what you no longer need. In the project folder:
+  - macOS and Linux: `rm -rf controle rascunhos relatorios evidencias`
+  - Windows (PowerShell): `Remove-Item -Recurse -Force controle, rascunhos, relatorios, evidencias`
+- Honor anyone who asks not to be contacted: record the person as `NAO_CONTATAR` in `controle/progresso.json` with `python3 scripts/registrar.py --nao-contatar "Name" --empresa "Company"` (on Windows, `py -3` instead of `python3`; or ask Claude during a round). They get no more drafts.
+
+**AI.** The processed content goes through Claude, under Anthropic's terms and [privacy policy](https://www.anthropic.com/legal/privacy).
+
+This is not legal advice.
+
 ## Notice
 
 LinkedIn's terms restrict automation. This project only reads, in the person's own logged-in browser, screens they would see themselves. Use it at your own risk.

@@ -8,7 +8,7 @@ Cada `/next-companies` faz **uma rodada** e para:
 2. **Confere o que você enviou** desde a data de corte (`progresso.json > data_corte`): convites e mensagens no LinkedIn (só leitura) e, no modo Gmail, a pasta Enviados. Quem já recebeu não ganha rascunho novo. Quem respondeu aparece em "Responderam".
 3. **Escolhe as próximas 10 empresas** na ordem combinada: vagas com "Certeza" → vagas "Provável" → freela/parceria → prospecção direta.
 4. **Uma empresa de cada vez, do começo ao fim**: histórico de contatos, canais (site, plataformas de vaga, LinkedIn), avaliação das vagas (filtros eliminatórios + aderência ≥ 75%), candidatura quando autorizada, rascunhos e relatório. Cada empresa é gravada com `scripts/registrar.py`, que atualiza o `progresso.json` e o `relatorio-final.xlsx` juntos.
-5. **Fecha a rodada**: atualiza `relatorio-parcial.md`, cria `relatorios/rodada-AAAA-MM-DD.md`, grava a nova data de corte, roda `scripts/checar_notas.py` e abre o painel.
+5. **Fecha a rodada**: atualiza `relatorio-parcial.md`, cria `relatorios/rodada-AAAA-MM-DD.md`, grava a nova data de corte, roda `scripts/checar_notas.py` e `scripts/checar_nao_contatar.py` e abre o painel.
 
 Para processar menos empresas: `/next-companies limite 3`.
 

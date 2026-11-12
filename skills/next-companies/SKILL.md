@@ -17,9 +17,10 @@ Tudo sobre o CANDIDATO está em `perfil.local.md` (o PERFIL). Nunca escreva dado
 
 ## Passo 1 — Carregar as regras e o estado
 
-1. Leia `PROMPT-prospeccao.md` inteiro. TODAS as regras dele valem (status permitidos, formato de relatório, pastas, planilha, aderência, filtros eliminatórios, regra de vaga de gestão, regras de envio, LinkedIn só leitura).
-2. Leia `perfil.local.md` inteiro e, se existirem: `controle/progresso.json` (`empresas`, `historico` e `data_corte`), `relatorio-parcial.md` (principalmente as seções 3, 4, 6 e 7), o arquivo do campo `arquivo_respostas` do PERFIL, `controle/perguntas-pendentes.md` e `controle/historico-contatos.md`.
-3. Monte a lista de empresas COM status final: toda empresa presente em `progresso.json > empresas`. Essas nunca são reprocessadas. Status com nome antigo (de versões anteriores do projeto) valem como o equivalente novo: `PULADA_PELO_*` = `PULADA_PELO_CANDIDATO`, `DESISTENCIA_DO_*` = `DESISTENCIA_DO_CANDIDATO`.
+1. Leia `PROMPT-prospeccao.md` inteiro. TODAS as regras dele valem (status permitidos, `NAO_CONTATAR`, formato de relatório, pastas, planilha, aderência, filtros eliminatórios, regra de vaga de gestão, regras de envio, LinkedIn só leitura).
+2. Leia `perfil.local.md` inteiro e, se existirem: `controle/progresso.json` (`empresas`, `historico`, `data_corte` e `nao_contatar`), `relatorio-parcial.md` (principalmente as seções 3, 4, 6 e 7), o arquivo do campo `arquivo_respostas` do PERFIL, `controle/perguntas-pendentes.md` e `controle/historico-contatos.md`.
+3. Monte a lista de empresas COM status final: toda empresa presente em `progresso.json > empresas`. Essas nunca são reprocessadas. Status com nome antigo (de versões anteriores do projeto) valem como o equivalente novo: `PULADA_PELO_*` = `PULADA_PELO_CANDIDATO`, `DESISTENCIA_DO_*` = `DESISTENCIA_DO_CANDIDATO`. Empresas com status `NAO_CONTATAR` estão nessa lista: nunca são processadas de novo.
+6. Monte a lista NÃO CONTATAR: as pessoas de `progresso.json > nao_contatar` (nome, empresa, e-mail, URL do perfil) e as empresas com status `NAO_CONTATAR`. Ninguém dessa lista recebe rascunho novo nesta rodada (PROMPT, seção 5.4).
 4. DATA DE CORTE: leia o campo `progresso.json > data_corte` (ISO). Os envios do CANDIDATO são procurados a partir dessa data. Não deduza. Se o campo estiver vazio ou faltar, use a data da nota mais antiga de `progresso.json > historico`; se não houver histórico, use a data de hoje (primeira rodada, nada a procurar).
 5. Anote o total de empresas da planilha (N, aba `Empresas` do arquivo do campo `planilha_empresas`).
 
@@ -78,6 +79,7 @@ Para cada uma, nesta ordem:
 - Vaga de gestão (Delivery Leader, Gerente de Projetos, Coordenador, Head, Product Manager e parecidas) nunca recebe candidatura automática: registre como `VAGA_GESTAO_PARA_O_CANDIDATO_DECIDIR` e siga.
 - Nunca altere o perfil ou currículo do CANDIDATO em nenhuma plataforma (Gupy, LinkedIn, InHire etc.), a menos que o PROMPT (seção 7.3) e o `arquivo_respostas` permitam.
 - Empresas com decisão do CANDIDATO (`DESISTENCIA_DO_CANDIDATO`, `PULADA_PELO_CANDIDATO`, empresas de `empresas_excluidas` e rascunhos marcados NÃO ENVIAR) não recebem nada novo.
+- `NAO_CONTATAR`: pessoa da lista do Passo 1.6 ou empresa com esse status nunca recebe rascunho novo (e-mail, LinkedIn, follow-up ou retomada). Antes de criar cada rascunho, confira o destinatário nessa lista por nome, e-mail e URL do perfil. Se alguém pedir na rodada para não ser contatado, registre na hora (PROMPT, seção 5.4). Rode `python3 scripts/checar_nao_contatar.py` ao fim da rodada e marque `NÃO ENVIAR` em todo rascunho que ele apontar.
 - Localização: siga o campo `modalidade` do PERFIL.
 - Ao concluir a 10ª (ou N-ésima) empresa: PARE. Não comece a próxima.
 
