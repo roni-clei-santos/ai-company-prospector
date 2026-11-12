@@ -33,6 +33,9 @@
   }
   a { color: var(--orange); }
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+  /* sticky footer: short tabs push the footer (and the rainbow strip) to the bottom of the window */
+  .page { display: flex; flex-direction: column; min-height: 100vh; }
+  .page > main { flex: 1 0 auto; width: 100%; }
 
   header.top { padding: 28px 0 8px; }
   .brand { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
@@ -132,7 +135,12 @@
   .chip b { color: var(--orange); font-variant-numeric: tabular-nums; }
   .chip:hover { border-color: var(--ink-3); }
   .check-line { margin-top: 12px; color: var(--ink-3); font-size: 12px; }
-  .check-line.bad { color: var(--warn); }
+  .seal { margin-top: 12px; font-size: 12px; font-weight: 600; }
+  .seal.ok { color: rgba(61, 214, 140, .8); }
+  .seal.bad { color: #FF7A1A; }
+  .seal.bad summary { cursor: pointer; list-style: none; }
+  .seal.bad summary::-webkit-details-marker { display: none; }
+  .seal.bad ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); font-weight: 500; }
   h2.group { margin-top: 30px; scroll-margin-top: 64px; }
   h2.group .count { display: inline-block; min-width: 26px; padding: 1px 9px; border-radius: 999px; background: var(--orange-soft); color: var(--orange); font-size: 13px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
   .task { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 16px; border-radius: 12px; background: var(--navy-2); border: 1px solid var(--line); transition: opacity .2s; }
@@ -177,6 +185,7 @@
 </style>
 </head>
 <body>
+<div class="page">
 <header class="top">
   <div class="wrap">
     <div class="brand"><span class="dot"></span> Prospecção de empresas</div>
@@ -188,7 +197,7 @@
 <nav class="tabs" aria-label="Seções">
   <div class="wrap">
     <a href="#pendentes" class="on">Pendentes</a>
-    <a href="#rodada">Esta rodada</a>
+    <a href="#rodada">Última rodada</a>
     <a href="#projeto">Projeto inteiro</a>
     <a href="#responderam">Responderam</a>
     <a href="#followups">Follow-ups com data</a>
@@ -205,6 +214,7 @@
     <div class="author">Feito por Roni Clei Santos · <a href="https://www.linkedin.com/in/roni-clei-santos/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/roni-clei-santos/ai-company-prospector" target="_blank" rel="noopener">Dar uma estrela no projeto</a></div></div>
 </footer>
 <div class="pride" aria-hidden="true"></div>
+</div>
 
 <script>
 (function () {
@@ -360,8 +370,12 @@
     const totals = joinPt([plural(li.length, "mensagem de LinkedIn", "mensagens de LinkedIn"), plural(em.length, "e-mail", "e-mails"),
       plural(due.length, "follow-up vencido", "follow-ups vencidos"), plural(dec.length, "decisão sua", "decisões suas")]);
     const c = p.conferencia || {};
-    const checkOk = c.linkedin_secao4 == null || c.linkedin_secao4 === c.linkedin_painel + (c.ocultos_nao_contatar || 0);
-    const check = c.fonte ? `<div class="check-line${checkOk ? "" : " bad"}">Conferência: ${esc(c.linkedin_secao4)} pessoas sem ✅ e sem "NÃO ENVIAR" na seção 4 do <code>${esc(c.fonte)}</code> · ${esc(c.linkedin_painel)} nesta lista${c.ocultos_nao_contatar ? ` · ${esc(c.ocultos_nao_contatar)} escondidas por NAO_CONTATAR` : ""}${checkOk ? "" : " · os números não batem: rode /painel"}</div>` : "";
+    const diffs = p.conferencia_diferencas || [];
+    const nDiff = Math.max(diffs.reduce((n, x) => n + (parseInt(x.nome, 10) && / NAO_CONTATAR$/.test(x.nome) ? parseInt(x.nome, 10) : 1), 0), Math.abs((c.linkedin_secao4 || 0) - (c.linkedin_painel || 0)));
+    const side = x => x.lado === "relatorio" ? "só no relatório (seção 4)" : "só nesta lista";
+    const check = !c.fonte ? "" : nDiff === 0 ? `<div class="seal ok">✓ Bate com o relatório</div>`
+      : `<details class="seal bad"><summary>⚠ ${nDiff} ${nDiff === 1 ? "diferença" : "diferenças"} com o relatório · <u>ver detalhes</u></summary>
+          <ul>${diffs.map(x => `<li><b>${esc(x.nome)}</b>: ${side(x)}${x.motivo ? ` (${esc(x.motivo)})` : ""}</li>`).join("") || `<li>${esc(c.linkedin_secao4)} no relatório, ${esc(c.linkedin_painel)} nesta lista</li>`}</ul></details>`;
     const chip = (target, n, lbl) => `<button class="chip" type="button" data-jump="${target}"><b>${n}</b> ${esc(lbl)}</button>`;
     let h = `<section id="pendentes" class="fade">
       ${MODE_LINE[MODE]}<div id="acao-status" class="mode-line" role="status" hidden></div>
@@ -467,22 +481,22 @@
 
     let html = renderPending(d);
 
-    // Esta rodada
-    html += `<section id="rodada" class="fade"><h2>Esta rodada ${r ? `<small>${esc(br(r.data))} · ${esc(r.arquivo)}</small>` : ""}</h2>`;
+    // Última rodada
+    html += `<section id="rodada" class="fade"><h2>Última rodada ${r ? `<small>${esc(br(r.data))} · ${esc(r.arquivo)}</small>` : ""}</h2>`;
     if (!r) {
       html += `<div class="empty">Ainda não há rodada. Rode <code>/next-companies</code>.</div>`;
     } else {
       const total = r.empresas.length;
       const drafts = (r.rascunhos_novos.email || 0) + (r.rascunhos_novos.linkedin || 0);
       html += `<div class="grid kpis">
-        <div class="card kpi"><div class="label">Empresas</div><div class="value">${total}</div><div class="hint">processadas nesta rodada</div></div>
+        <div class="card kpi"><div class="label">Empresas</div><div class="value">${total}</div><div class="hint">processadas na última rodada</div></div>
         <div class="card kpi"><div class="label">Rascunhos novos</div><div class="value accent">${drafts}</div><div class="hint">${r.rascunhos_novos.linkedin} LinkedIn · ${r.rascunhos_novos.email} e-mail</div></div>
         <div class="card kpi"><div class="label">Candidaturas</div><div class="value">${r.candidaturas}</div><div class="hint">enviadas com confirmação</div></div>
         <div class="card kpi"><div class="label">Follow-ups</div><div class="value">${(d.followups || []).length}</div><div class="hint">com data marcada</div></div>
       </div>`;
       html += `<div class="grid two" style="margin-top:14px">
-        <div class="card"><h3>O que fazer agora</h3>${r.o_que_fazer.length ? `<ol class="todo">${r.o_que_fazer.map(todoItem).join("")}</ol>` : `<div class="empty">Nada pendente nesta rodada.</div>`}</div>
-        <div class="card"><h3>Status desta rodada</h3>${Object.keys(r.status).length ? '<div class="chart">' + hbars(Object.entries(r.status).sort((a, b) => b[1] - a[1]).map(([s, n]) => ({ label: label(s), value: n })), { aria: "Status desta rodada", labelW: 170 }) + '</div>' : `<div class="empty">Sem status.</div>`}</div>
+        <div class="card"><h3>O que fazer agora</h3>${r.o_que_fazer.length ? `<ol class="todo">${r.o_que_fazer.map(todoItem).join("")}</ol>` : `<div class="empty">Nada pendente na última rodada.</div>`}</div>
+        <div class="card"><h3>Status da última rodada</h3>${Object.keys(r.status).length ? '<div class="chart">' + hbars(Object.entries(r.status).sort((a, b) => b[1] - a[1]).map(([s, n]) => ({ label: label(s), value: n })), { aria: "Status da última rodada", labelW: 170 }) + '</div>' : `<div class="empty">Sem status.</div>`}</div>
       </div>`;
       html += `<div class="card" style="margin-top:14px"><h3>Empresas da rodada</h3><div class="scroll-x"><table>
         <thead><tr><th>#</th><th>Empresa</th><th>Status</th><th class="num">Rascunhos</th></tr></thead><tbody>

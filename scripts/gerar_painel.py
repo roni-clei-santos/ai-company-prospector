@@ -213,6 +213,12 @@ def count_linkedin_section4(parcial_text):
     return sum(1 for cells, line in rows if len(cells) >= 3 and is_pending_row(line))
 
 
+def section4_pending_names(parcial_text):
+    """Names of the pending people in section 4 (same rule as count_linkedin_section4)."""
+    _, rows = table(section(parcial_text, "4."))
+    return [split_recipient(cells[2])[0] for cells, line in rows if len(cells) >= 3 and is_pending_row(line)]
+
+
 def _number(text):
     m = re.search(r"#?\s*(\d+)", text or "")
     return int(m.group(1)) if m else None
@@ -543,7 +549,21 @@ def build_pending(root, prog, parsed_rounds, companies, statuses, today):
     replies = [it for it in replies if it["id"] not in ids]
     followups = [f for f in followups if f["id"] not in ids]
     due = [f for f in followups if f["data"] <= today]
+    # names on only one side: section 4 of relatorio-parcial.md (no ✅, no NÃO ENVIAR) vs this list
+    listed = {_fold(it["nome"]) for it in linkedin}
+    report_names = section4_pending_names(parcial)
+    done_names = {_fold(f.get("descricao", "")[len("LinkedIn para "):]) for f in done if f.get("tipo") == "linkedin"}
+    only_report = [n for n in report_names if _fold(n) not in listed]
+    differences = [{"nome": n, "lado": "relatorio", "motivo": "marcado como Feito no painel"}
+                   for n in only_report if _fold(n) in done_names]
+    blocked = [n for n in only_report if _fold(n) not in done_names]
+    if blocked:  # NAO_CONTATAR people are never named in the panel, not even here
+        differences.append({"nome": f"{len(blocked)} {'pessoa' if len(blocked) == 1 else 'pessoas'} NAO_CONTATAR",
+                            "lado": "relatorio", "motivo": "marque NÃO ENVIAR no relatório"})
+    report_folded = {_fold(n) for n in report_names}
+    differences += [{"nome": it["nome"], "lado": "lista", "motivo": ""} for it in linkedin if _fold(it["nome"]) not in report_folded]
     return {
+        "conferencia_diferencas": differences,
         "enviados_hoje": [{k: f.get(k) for k in ("id", "tipo", "data", "descricao", "empresa", "numero")}
                           for f in done if f.get("data") == today],
         "hoje": today,
@@ -563,8 +583,11 @@ def _sheet_rows(root):
         path = find_company_sheet(root)
     if not path or not Path(path).exists():
         return [], []
-    ws = openpyxl.load_workbook(path, read_only=True)["Empresas"]
-    rows = list(ws.iter_rows(values_only=True))
+    wb = openpyxl.load_workbook(path, read_only=True)
+    try:
+        rows = list(wb["Empresas"].iter_rows(values_only=True))
+    finally:
+        wb.close()  # read-only mode keeps the file open; Windows could not replace it afterwards
     return (list(rows[0]), rows[1:]) if rows else ([], [])
 
 
@@ -689,7 +712,7 @@ def _running_server(root):
     return None
 
 
-def ensure_server(root, wait=15.0):
+def ensure_server(root, wait=45.0):
     """Start scripts/servidor_painel.py in the background (detached, all 3 systems) unless one is running."""
     url = _running_server(root)
     if url:

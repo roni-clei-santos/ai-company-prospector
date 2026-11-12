@@ -50,11 +50,11 @@ Pessoas e empresas marcadas `NAO_CONTATAR` nunca aparecem como pendentes. Seçã
 
 ![Aba "Pendentes" do painel demo](img/painel-pendentes.png)
 
-## Esta rodada
+## Última rodada
 
 Empresas, rascunhos novos, candidaturas, follow-ups, "O que fazer agora", status da rodada e a tabela das empresas.
 
-![Aba "Esta rodada" do painel demo](img/painel-rodada.png)
+![Aba "Última rodada" do painel demo](img/painel-rodada.png)
 
 ## Projeto inteiro
 

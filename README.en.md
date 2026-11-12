@@ -27,7 +27,7 @@
   <a href="https://code.claude.com/docs/en/overview"><img alt="Built for Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
 </p>
 
-<p align="center"><a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><img src="assets/demo.gif" alt="Demo dashboard: Pendentes (to-do), this round, whole project, replies and follow-ups (fictitious data)" width="100%"></a></p>
+<p align="center"><a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><img src="assets/demo.gif" alt="Demo dashboard: Pendentes (to-do), last round, whole project, replies and follow-ups (fictitious data)" width="100%"></a></p>
 
 <p align="center"><sub>Demo dashboard with 100% fictitious data (in Portuguese). <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Open the live demo</a>.</sub></p>
 

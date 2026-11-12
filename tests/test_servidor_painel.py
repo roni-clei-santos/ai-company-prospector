@@ -191,7 +191,8 @@ def test_ensure_server_starts_and_reuses(tmp_path, monkeypatch):
     make_project(tmp_path, monkeypatch)
     url = gerar_painel.ensure_server(tmp_path)
     try:
-        assert url and re.match(r"^http://127\.0\.0\.1:\d+/index\.html$", url)
+        log = tmp_path / "controle" / ".painel-servidor.log"
+        assert url and re.match(r"^http://127\.0\.0\.1:\d+/index\.html$", url), log.read_text(errors="replace") if log.exists() else "sem log"
         assert gerar_painel.ensure_server(tmp_path) == url  # reused, not a second server
         with urllib.request.urlopen(url.replace("index.html", "api/estado"), timeout=5) as r:
             assert Path(json.loads(r.read().decode("utf-8"))["raiz"]).resolve() == tmp_path.resolve()
@@ -200,7 +201,10 @@ def test_ensure_server_starts_and_reuses(tmp_path, monkeypatch):
 
 
 def _stop_detached(root):
-    state = json.loads((root / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))
+    path = root / "controle" / ".painel-servidor.json"
+    if not path.exists():
+        return
+    state = json.loads(path.read_text(encoding="utf-8"))
     port = state["porta"]
     if sys.platform == "win32":
         subprocess.run(["powershell", "-NoProfile", "-Command",
