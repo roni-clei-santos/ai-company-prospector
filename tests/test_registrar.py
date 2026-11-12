@@ -42,7 +42,7 @@ def project(tmp_path, monkeypatch):
 def test_record_creates_both_files(project):
     registrar.record_company({"numero": 2, "empresa": "Loja Exemplo 2",
                               "status": "PULADA_PELO_ALEX (10/11/2026)", "motivo": "teste"})
-    prog = json.loads((project / "controle" / "progresso.json").read_text())
+    prog = json.loads((project / "controle" / "progresso.json").read_text(encoding="utf-8"))
     assert prog["empresas"][0]["status"] == "PULADA_PELO_CANDIDATO"
     assert prog["empresas"][0]["data"] == "2026-11-10"
     ws = openpyxl.load_workbook(project / "relatorio-final.xlsx")["Empresas"]
@@ -60,7 +60,7 @@ def test_invalid_status_rejected(project):
 
 def test_cutoff_and_history(project):
     registrar.main(["--data-corte", "2026-11-09", "--historico", "nota de teste"])
-    prog = json.loads((project / "controle" / "progresso.json").read_text())
+    prog = json.loads((project / "controle" / "progresso.json").read_text(encoding="utf-8"))
     assert prog["data_corte"] == "2026-11-09"
     assert prog["historico"][-1]["nota"] == "nota de teste"
 
@@ -70,4 +70,4 @@ def test_backup_before_each_write(project):
     registrar.main(["--historico", "outra nota"])
     backups = list((project / "controle" / ".backups").glob("progresso-*.json"))
     assert len(backups) == 1  # the first write had nothing to back up
-    assert json.loads(backups[0].read_text())["data_corte"] == "2026-11-09"
+    assert json.loads(backups[0].read_text(encoding="utf-8"))["data_corte"] == "2026-11-09"

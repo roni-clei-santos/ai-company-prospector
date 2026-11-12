@@ -46,16 +46,16 @@ def test_build_spreadsheet(project):
     assert names == ["Loja Exemplo 1", "Agência Exemplo 2", "Antiga Casa"]
     assert ws.cell(row=4, column=8).value.startswith("Ex-empregador")
     assert ws.cell(row=4, column=2).fill.fgColor.rgb.endswith("FFF4B3")
-    prog = json.loads((project / "controle" / "progresso.json").read_text())
+    prog = json.loads((project / "controle" / "progresso.json").read_text(encoding="utf-8"))
     assert prog["empresas"] == [] and prog["data_corte"] is None
 
 
 def test_limit_and_progress_not_overwritten(project):
     (project / "controle").mkdir()
-    (project / "controle" / "progresso.json").write_text('{"empresas": [{"numero": 1}], "historico": []}')
+    (project / "controle" / "progresso.json").write_text('{"empresas": [{"numero": 1}], "historico": []}', encoding="utf-8")
     src = project / "c.json"
     src.write_text(json.dumps([row(f"Loja Exemplo {i}", f"https://l{i}.example.com") for i in range(1, 8)]))
     assert montar_planilha.main([str(src), "out.xlsx", "--limite", "3"]) == 0
     ws = openpyxl.load_workbook(project / "out.xlsx")["Empresas"]
     assert ws.max_row == 4
-    assert json.loads((project / "controle" / "progresso.json").read_text())["empresas"] == [{"numero": 1}]
+    assert json.loads((project / "controle" / "progresso.json").read_text(encoding="utf-8"))["empresas"] == [{"numero": 1}]

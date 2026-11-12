@@ -90,6 +90,11 @@ def install_skill(src, home_skills, use_copy, repo=None):
 
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles/pipes may not be UTF-8: never crash on ✔/✘
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(description="Instala ou atualiza as skills do projeto no Claude Code.")
     ap.add_argument("--copy", action="store_true", help="copiar as pastas em vez de criar links (padrão no Windows)")
     args = ap.parse_args(argv)

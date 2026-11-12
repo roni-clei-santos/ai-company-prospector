@@ -1,0 +1,74 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    env:
+      PY_PYTHON: "3.12"
+      PY_PYTHON3: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # macOS / Linux: install.sh in a temporary HOME, then tests and the panel (same step = same HOME)
+      - name: install.sh + pytest + panel (macOS / Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/home"
+          mkdir -p "$HOME"
+          ./install.sh
+          ./install.sh                                   # idempotent: second run must also pass
+          test -L "$HOME/.claude/skills/next-companies"
+          test -L "$HOME/.claude/skills/build-company-list"
+          test -f perfil.local.md
+          python -m pytest -q
+          python .github/ci/projeto_demo.py "$RUNNER_TEMP/proj"
+          cd "$RUNNER_TEMP/proj"
+          python "$GITHUB_WORKSPACE/scripts/gerar_painel.py" --no-open
+          test -s painel/data.json
+
+      # Windows: install.ps1 in a temporary USERPROFILE (PowerShell 5.1, then 7), tests and the panel
+      - name: install.ps1 + pytest + panel (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:USERPROFILE = Join-Path $env:RUNNER_TEMP 'home'
+          $env:HOME = $env:USERPROFILE
+          New-Item -ItemType Directory -Force -Path $env:USERPROFILE | Out-Null
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 (PowerShell 5.1) exit $LASTEXITCODE" }
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 (PowerShell 7) exit $LASTEXITCODE" }
+          foreach ($s in 'next-companies', 'build-company-list') {
+            if (-not (Test-Path "$env:USERPROFILE\.claude\skills\$s\SKILL.md")) { throw "skill $s not copied" }
+            if (-not (Test-Path "$env:USERPROFILE\.claude\skills\$s\.installed-from")) { throw "skill $s without .installed-from" }
+          }
+          if (-not (Test-Path .\perfil.local.md)) { throw "perfil.local.md not created" }
+          python -m pytest -q
+          if ($LASTEXITCODE -ne 0) { throw "pytest exit $LASTEXITCODE" }
+          $proj = Join-Path $env:RUNNER_TEMP 'proj'
+          python .github\ci\projeto_demo.py $proj
+          if ($LASTEXITCODE -ne 0) { throw "projeto_demo exit $LASTEXITCODE" }
+          Push-Location $proj
+          python (Join-Path $env:GITHUB_WORKSPACE 'scripts\gerar_painel.py') --no-open
+          if ($LASTEXITCODE -ne 0) { throw "gerar_painel exit $LASTEXITCODE" }
+          if (-not (Test-Path .\painel\data.json)) { throw "painel/data.json not created" }
+          Pop-Location
