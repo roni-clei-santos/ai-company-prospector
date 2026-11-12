@@ -135,6 +135,16 @@ Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the f
 
 ## Requirements
 
+What has been validated on each system:
+
+| System | Installer and automated tests | Full flow with Claude Code + LinkedIn |
+|---|---|---|
+| macOS | ✅ | ✅ validated by the author |
+| Linux | ✅ | not yet validated by a user |
+| Windows | ✅ | not yet validated by a user |
+
+On Linux or Windows? Run the full flow and [tell us how it went in an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues/new?template=relato-de-sistema.md). It helps the project a lot.
+
 | System | You need |
 |---|---|
 | All | [Claude Code](https://code.claude.com/docs/en/setup) logged in and Git |
@@ -196,7 +206,7 @@ Your profile, spreadsheets, drafts, reports and résumés stay on your computer 
 <details>
 <summary><b>Does it work on Windows?</b></summary>
 
-Yes. `install.ps1` runs on PowerShell 5.1 and 7, copies the skills (Windows needs special permission for symbolic links) and is tested on every push with GitHub Actions (`windows-latest`): installer, tests and dashboard, together with macOS and Linux. The skills themselves have not been used on a real Windows machine yet; if something breaks, [open an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues).
+Installer and automated tests: ✅. `install.ps1` runs on PowerShell 5.1 and 7, copies the skills (Windows needs special permission for symbolic links) and is tested on every push with GitHub Actions (`windows-latest`), with the tests and the dashboard. Full flow with Claude Code + LinkedIn: not yet validated by a user. On Windows? Run the full flow and [tell us how it went in an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues/new?template=relato-de-sistema.md). It helps the project a lot.
 </details>
 
 ## Notice

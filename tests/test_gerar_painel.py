@@ -19,12 +19,21 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 import gerar_painel  # noqa: E402
 
-SKIP_RENDER_REASON = "Chrome headless trava no runner macOS do GitHub; renderização testada nos outros sistemas"
+SKIP_RENDER_REASON = "Chrome headless trava no runner macOS do GitHub; renderização testada no Linux e localmente no macOS"
+NO_CHROME_REASON = "Chrome não encontrado neste sistema"
 
-CHROME = next((p for p in [
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    shutil.which("google-chrome") or "", shutil.which("chromium") or "",
-] if p and Path(p).exists()), None)
+def _chrome_candidates():
+    """Where Google Chrome usually lives on macOS, Windows (from environment variables) and Linux."""
+    found = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
+        base = os.environ.get(var)
+        if base:
+            found.append(str(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe"))
+    found += [shutil.which(name) or "" for name in ("google-chrome", "google-chrome-stable", "chromium", "chrome")]
+    return found
+
+
+CHROME = next((p for p in _chrome_candidates() if p and Path(p).exists()), None)
 
 ROUND_HEAD = """# Rodada de 11/11/2026: 3 empresas (#1 a #3)
 
@@ -80,12 +89,14 @@ def make_project(tmp_path, monkeypatch, round_text):
 
 
 def render(tmp_path):
+    if not CHROME:
+        pytest.skip(NO_CHROME_REASON)
     profile = tempfile.mkdtemp(prefix="chrome-test-")  # own profile: never touches the user's Chrome
     try:
         out = subprocess.run([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={profile}",
                               "--no-first-run", "--no-default-browser-check", "--virtual-time-budget=3000",
                               "--dump-dom", (tmp_path / "painel" / "index.html").as_uri()],
-                             capture_output=True, text=True, timeout=30).stdout
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
     except subprocess.TimeoutExpired:
         # Only skip on GitHub Actions AND macOS (both at once); anywhere else the render stays mandatory.
         # The panel data assertions in each test run before render(), so they always run.
@@ -109,11 +120,10 @@ def test_with_followups(tmp_path, monkeypatch):
     ]
     assert todo[1]["subitens"] == ["12/11 — Loja Exemplo 1 (#1)", "20/11 — Loja Exemplo 2 (#2) e Loja Exemplo 3 (#3)"]
     assert len(data["followups"]) == 2
-    if CHROME:
-        html = render(tmp_path)
-        assert html.count('<ul class="sub">') == 1
-        assert "12/11 — Loja Exemplo 1 (#1)" in html
-        assert "20/11 — Loja Exemplo 2 (#2) e Loja Exemplo 3 (#3)" in html
+    html = render(tmp_path)
+    assert html.count('<ul class="sub">') == 1
+    assert "12/11 — Loja Exemplo 1 (#1)" in html
+    assert "20/11 — Loja Exemplo 2 (#2) e Loja Exemplo 3 (#3)" in html
 
 
 def test_without_followups(tmp_path, monkeypatch):
@@ -121,12 +131,11 @@ def test_without_followups(tmp_path, monkeypatch):
     todo = data["rodada"]["o_que_fazer"]
     assert [t["texto"] for t in todo] == ["Enviar as 2 mensagens de LinkedIn.", "Conferir o e-mail da Loja Exemplo 2."]
     assert data["followups"] == []
-    if CHROME:
-        html = render(tmp_path)
-        assert "Follow-ups" not in html
-        assert '<ul class="sub">' not in html
-        # an <ol> numbers its <li> items itself: two top-level items -> 1. and 2.
-        assert len(re.findall(r"<li>", html)) == 2
+    html = render(tmp_path)
+    assert "Follow-ups" not in html
+    assert '<ul class="sub">' not in html
+    # an <ol> numbers its <li> items itself: two top-level items -> 1. and 2.
+    assert len(re.findall(r"<li>", html)) == 2
 
 
 def test_followup_label_formats():
