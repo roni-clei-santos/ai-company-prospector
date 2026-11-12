@@ -19,7 +19,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 import gerar_painel  # noqa: E402
 
-SKIP_RENDER_REASON = "Chrome headless trava no runner macOS do GitHub; renderização testada no Linux e localmente no macOS"
+SKIP_RENDER_REASON = "Chrome headless trava no runner macOS do GitHub; renderização testada no Linux, no Windows e localmente no macOS"
 NO_CHROME_REASON = "Chrome não encontrado neste sistema"
 
 def _chrome_candidates():
