@@ -16,7 +16,7 @@ Correção, digitando no próprio Claude Code (o `!` roda o comando direto, sem 
 ! rtk gain
 ```
 
-Se o erro for de um programa que não está no PATH (como o `pytest` instalado com `--user`), rode pelo Python: `python3 -m pytest`, ou acrescente `~/Library/Python/3.x/bin` ao PATH.
+Se o erro for de um programa que não está no PATH (como o `pytest` instalado com `--user`), rode pelo Python: `python3 -m pytest` (Windows: `py -3 -m pytest`), ou acrescente ao PATH a pasta de scripts do usuário: `~/Library/Python/3.x/bin` no macOS, `~/.local/bin` no Linux.
 
 ## O `controle/progresso.json` está corrompido
 

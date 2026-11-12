@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 190" width="1200" height="190" role="img" aria-labelledby="t">
+  <title id="t">Números do uso real do autor: 68 empresas processadas, 84 rascunhos criados, 5 respostas recebidas, 5 rodadas</title>
+  <style>
+    .n { font: 800 52px Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #FF7A1A; text-anchor: middle; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+    .l { font: 600 17px Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #B9C6D8; text-anchor: middle; }
+    .c { animation: in .7s ease-out backwards; }
+    @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .c { animation: none; } }
+  </style>
+  <rect width="1200" height="190" rx="20" fill="#0B1F3A"/>
+  <g class="c" style="animation-delay:0.00s">
+    <rect x="24.0" y="24" width="276.0" height="142" rx="16" fill="#12294A" stroke="#26446F"/>
+    <text x="162.0" y="102" class="n">68</text>
+    <text x="162.0" y="140" class="l">empresas processadas</text>
+  </g>
+  <g class="c" style="animation-delay:0.12s">
+    <rect x="316.0" y="24" width="276.0" height="142" rx="16" fill="#12294A" stroke="#26446F"/>
+    <text x="454.0" y="102" class="n">84</text>
+    <text x="454.0" y="140" class="l">rascunhos criados</text>
+  </g>
+  <g class="c" style="animation-delay:0.24s">
+    <rect x="608.0" y="24" width="276.0" height="142" rx="16" fill="#12294A" stroke="#26446F"/>
+    <text x="746.0" y="102" class="n">5</text>
+    <text x="746.0" y="140" class="l">respostas recebidas</text>
+  </g>
+  <g class="c" style="animation-delay:0.36s">
+    <rect x="900.0" y="24" width="276.0" height="142" rx="16" fill="#12294A" stroke="#26446F"/>
+    <text x="1038.0" y="102" class="n">5</text>
+    <text x="1038.0" y="140" class="l">rodadas</text>
+  </g>
+</svg>

@@ -1,106 +1,212 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/header-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/header-light.svg">
+  <img src="assets/header-light.svg" alt="AI Company Prospector" width="100%">
+</picture>
+
+<h3 align="center">Stop looking for jobs. Start looking for companies.</h3>
+
 <p align="center">
-  <img src="assets/header.svg" alt="AI Company Prospector — Stop looking for jobs. Start looking for companies." width="100%">
+  A Claude Code agent that builds the list of companies using your tech stack, researches them one by one<br>
+  and leaves LinkedIn and email drafts ready for <b>you</b> to review and send.
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
-  <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-FF7A1A?style=flat-square&logo=python&logoColor=white&labelColor=0B1F3A">
-  <a href="https://docs.claude.com/en/docs/claude-code/overview"><img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
-  <a href="https://www.rtk-ai.app/"><img alt="RTK" src="https://img.shields.io/badge/RTK-token%20savings-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
-  <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><img alt="Live demo" src="https://img.shields.io/badge/demo-live%20dashboard-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
+  <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><b>Live demo</b></a> ·
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="docs/guia/01-instalacao.md"><b>Guide (PT)</b></a> ·
+  <a href="ROADMAP.md"><b>Roadmap</b></a> ·
+  <a href="README.md"><b>Português</b></a>
 </p>
-
-<p align="center"><b>English</b> · <a href="README.md">Português</a></p>
-
-> The agent's prompts, skills and guides are currently in Brazilian Portuguese (code and comments are in English). An English version is on the [roadmap](ROADMAP.md).
-
-An agent for [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) that flips the job search around: instead of waiting for the right opening, it **builds the list of companies that use your technology**, researches each one (open roles, recruiters, HR e-mails, freelance or partnership chances) and **leaves drafts ready for you to review and send**. It works in rounds of 10 companies, remembers everything between rounds, and keeps a dashboard up to date.
 
 <p align="center">
-  <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/"><img src="assets/demo.gif" alt="Demo dashboard with fictitious data switching sections" width="100%"></a>
-  <br><sub>Demo dashboard with 100% fictitious data. <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Open the live demo</a>.</sub>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
+  <a href="https://github.com/roni-clei-santos/ai-company-prospector/actions/workflows/test.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/roni-clei-santos/ai-company-prospector/test.yml?branch=main&style=flat-square&label=tests&labelColor=0B1F3A"></a>
+  <a href="#quick-start"><img alt="macOS, Linux and Windows (beta)" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows%20beta-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
+  <a href="https://code.claude.com/docs/en/overview"><img alt="Built for Claude Code" src="https://img.shields.io/badge/Claude%20Code-skills-FF7A1A?style=flat-square&labelColor=0B1F3A"></a>
 </p>
 
-## Requirements
+https://github.com/user-attachments/assets/83a9fab9-625a-4bb9-b654-534508b5008c
 
-- macOS (`install.sh` is Mac-only; Windows and Linux are not supported yet);
-- [Homebrew](https://brew.sh);
-- Python 3.9 or newer;
-- Git;
-- [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) installed and signed in, with a Claude account that gives access to Claude Code;
-- Google Chrome with the Claude in Chrome extension connected ([Chrome guide](docs/guia/03-chrome.md));
-- a LinkedIn account, signed in on that Chrome.
+<p align="center"><sub>Demo dashboard with 100% fictitious data (in Portuguese). <a href="https://roni-clei-santos.github.io/ai-company-prospector/demo/">Open the live demo</a>.</sub></p>
+
+## Before × After
+
+| Looking for jobs in the dark | Prospecting companies with the agent |
+|---|---|
+| Waits for the right job to show up on a job board | Starts from the list of companies using your tech stack, each with its source |
+| Sends the same résumé everywhere | Every job gets a fit score and, if it passes, a tailored résumé |
+| Doesn't know who the recruiter is or the HR email | Finds recruiters, HR and emails, and checks each person's current role |
+| Loses track of who replied and who needs a follow-up | Memory across rounds: checks what you sent and dates the follow-ups |
+| Forgets agencies and freelance chances | Also opens partnership and white-label talks with agencies in your stack |
+
+## Features
+
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icons/lista.svg" width="40" alt=""><br><b>Company list with sources</b><br><code>/build-company-list</code> builds the spreadsheet from public sources, with evidence and a link for every company.</td>
+    <td width="33%" valign="top"><img src="assets/icons/rodadas.svg" width="40" alt=""><br><b>Rounds of 10, with memory</b><br><code>/next-companies</code> works through 10 companies at a time and resumes exactly where it stopped.</td>
+    <td width="33%" valign="top"><img src="assets/icons/leitura.svg" width="40" alt=""><br><b>Read-only LinkedIn</b><br>Opens invitations, messages, jobs and company pages. Never sends, likes, follows or withdraws.</td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icons/rascunhos.svg" width="40" alt=""><br><b>Drafts you review</b><br>LinkedIn messages and emails in your tone of voice, saved as drafts for you to read and send.</td>
+    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Automatic dashboard</b><br>Each round ends with a dashboard: the round, the whole project, who replied and dated follow-ups.</td>
+    <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Token savings with RTK</b><br>The installer sets up <a href="https://github.com/rtk-ai/rtk">RTK</a>, which trims command output before it reaches Claude.</td>
+  </tr>
+</table>
+
+## How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/flow-dark.en.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/flow-light.en.svg">
+  <img src="assets/flow-light.en.svg" alt="perfil.local.md → /build-company-list → Spreadsheet → /next-companies (rounds of 10) → Drafts → You review and send → Dashboard; the next round checks what you sent" width="100%">
+</picture>
+
+`perfil.local.md` is the single source of truth about you (dated work history, skills, salary floors, tone of voice). The agent never states anything that is not in it, in your résumé or in your answers.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/stats-dark.en.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/stats-light.en.svg">
+  <img src="assets/stats-light.en.svg" alt="Numbers from the author's real use" width="100%">
+</picture>
+<p align="center"><sub>Numbers from the author's real use.</sub></p>
 
 ## Quick start
 
+<details open>
+<summary><b>macOS</b></summary>
+
 ```bash
+# 1. Claude Code (if you don't have it yet)
+curl -fsSL https://claude.ai/install.sh | bash
+
+# 2. Project
 git clone https://github.com/roni-clei-santos/ai-company-prospector.git
 cd ai-company-prospector
 ./install.sh
 ```
 
-1. **`./install.sh`**: checks Homebrew, Python and RTK, installs the skills into Claude Code and creates your `perfil.local.md` (fill it with your data: [profile guide](docs/guia/02-perfil.md), in Portuguese).
-2. **`/chrome` and LinkedIn login**: open Claude Code in the folder, run `/chrome` and sign in to LinkedIn in Chrome ([Chrome guide](docs/guia/03-chrome.md)).
-3. **`/build-company-list`**: answer 6 questions and get the company spreadsheet. Then, every round: **`/next-companies`**.
+`install.sh` uses Homebrew for Python and RTK, installs the skills in `~/.claude/skills` and creates your `perfil.local.md`.
+</details>
 
-Full step-by-step guide: [docs/guia](docs/guia/01-instalacao.md).
+<details>
+<summary><b>Linux</b></summary>
 
-## How it works
+```bash
+# 1. Claude Code (if you don't have it yet)
+curl -fsSL https://claude.ai/install.sh | bash
 
-```mermaid
-flowchart LR
-    P["perfil.local.md<br/>(your data, only on your computer)"] --> B["/build-company-list"]
-    B --> X["spreadsheet<br/>empresas-technology-country.xlsx"]
-    X --> N["/next-companies<br/>(rounds of 10 companies)"]
-    N --> R["drafts<br/>LinkedIn and e-mail"]
-    R --> V{{"YOU review and send"}}
-    V --> D["dashboard<br/>painel/index.html"]
-    D -. "next round checks what you sent" .-> N
-    style V fill:#FF7A1A,stroke:#FF7A1A,color:#0B1F3A
-    style P fill:#0B1F3A,stroke:#26446F,color:#F4F7FB
+# 2. Project
+git clone https://github.com/roni-clei-santos/ai-company-prospector.git
+cd ai-company-prospector
+./install.sh
 ```
 
-| Step | What happens |
+`install.sh` installs `python3` and `pip` with `apt`, `dnf` or `pacman` (it may ask for your `sudo` password), RTK with its official script and the skills in `~/.claude/skills`. Tested on a clean Ubuntu 24.04.
+</details>
+
+<details>
+<summary><b>Windows (beta)</b></summary>
+
+```powershell
+# 1. Claude Code (if you don't have it yet)
+irm https://claude.ai/install.ps1 | iex
+
+# 2. Project
+git clone https://github.com/roni-clei-santos/ai-company-prospector.git
+cd ai-company-prospector
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+`install.ps1` checks Python (`py -3` or `python`), installs RTK with `winget` and **copies** the skills to `%USERPROFILE%\.claude\skills`. After every `git pull`, run `py -3 scripts\atualizar_skills.py` to copy the new version.
+</details>
+
+Then, on all three systems: open Claude Code in the folder (`claude`), run `/chrome`, log in to LinkedIn in that Chrome, fill in `perfil.local.md` and run **`/build-company-list`**. Every round: **`/next-companies`**.
+
+## Requirements
+
+| System | You need |
 |---|---|
-| `perfil.local.md` | The single source of truth about you: dated work history, skills (have / partial / don't have), salary floors, tone of voice, companies to exclude. Nothing outside it is ever claimed. |
-| `/build-company-list` | Searches official partner directories, Clutch, TheirStack, events, ecosystem partners, job posts and case studies. Every company comes with evidence and a source link; "Provável" (probable) rows are yellow. |
-| `/next-companies` | Checks what you sent since the last round, processes the next 10 companies, scores each job (75% fit rule), builds a tailored CV and drafts, records everything and stops. |
-| Dashboard | `painel/index.html`: this round, the whole project, who replied and dated follow-ups. |
+| All | [Claude Code](https://code.claude.com/docs/en/setup) logged in, Git, Google Chrome with the Claude in Chrome extension ([guide, PT](docs/guia/03-chrome.md)) and a LinkedIn account |
+| macOS 13+ | [Homebrew](https://brew.sh) (the installer takes care of Python 3 and RTK) |
+| Linux | `sudo` and `apt`, `dnf` or `pacman`, or Python 3.9+ with `pip` already installed |
+| Windows 10+ (beta) | Python 3.9+ ([python.org](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.12`) |
+
+Full step-by-step guide (Portuguese): [docs/guia](docs/guia/01-instalacao.md). The skills, the agent rules and the guides are in Portuguese for now; an English version is on the [roadmap](ROADMAP.md).
 
 ## Principles
 
-- **AI drafts, humans decide.** Messages and e-mails are always drafts. Management roles never get an automatic application.
-- **LinkedIn is read-only.** It opens sent invitations, messages, jobs and company pages. It never sends, accepts, withdraws, likes or follows.
-- **Memory between rounds.** `controle/progresso.json` keeps each company's status and the cut-off date; nothing is redone and no contact is repeated.
-- **Nothing leaves without review.** E-mail stays as a file (`modo_email: "arquivo"`) or as a Gmail draft (`"gmail_rascunho"`). You read, edit and send.
-- **It never makes things up.** Every statement about you comes from your profile, your CV or your answers. When in doubt, it asks.
+<table>
+  <tr><td width="48"><img src="assets/icons/decide.svg" width="32" alt=""></td><td><b>AI drafts, you decide.</b> Messages and emails are always drafts, and management jobs never get an automatic application.</td></tr>
+  <tr><td><img src="assets/icons/leitura.svg" width="32" alt=""></td><td><b>Read-only on LinkedIn.</b> At a human pace. If a rate-limit or verification warning shows up, it stops.</td></tr>
+  <tr><td><img src="assets/icons/memoria.svg" width="32" alt=""></td><td><b>Memory across rounds.</b> <code>controle/progresso.json</code> keeps each company's status; nothing is redone and no contact is repeated.</td></tr>
+  <tr><td><img src="assets/icons/revisao.svg" width="32" alt=""></td><td><b>Nothing goes out unreviewed.</b> Email stays in a file or as a Gmail draft. You read, edit and send.</td></tr>
+  <tr><td><img src="assets/icons/verdade.svg" width="32" alt=""></td><td><b>Never makes things up.</b> Every statement about you comes from your profile, résumé or answers. When in doubt, it asks.</td></tr>
+</table>
 
-## Layout
+## FAQ
 
-```
-PROMPT-prospeccao.md        the agent's full rules (generic)
-perfil.example.md           profile template (copy to perfil.local.md)
-skills/                     /build-company-list, /next-companies and the shared preflight
-scripts/                    registrar, montar_planilha, gerar_cv, checar_notas, gerar_painel, migrar_status
-painel/index.html           dashboard (HTML + CSS + JS, no build step)
-docs/guia/                  step-by-step guide · docs/demo/ = GitHub Pages demo
-tests/                      pytest
-```
+<details>
+<summary><b>Is it safe for my LinkedIn account?</b></summary>
 
-Your data (`perfil.local.md`, `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, spreadsheets and PDFs) stays **only on your computer**: it is in `.gitignore`.
+The agent only reads, in your own logged-in Chrome, screens you would see yourself: sent invitations, messages, jobs, pages and profiles. It browses at a human pace and stops using LinkedIn for the round if a rate-limit or verification warning shows up. Still, LinkedIn's terms restrict automation (see the notice below).
+</details>
 
-## Disclaimer
+<details>
+<summary><b>Does it send messages by itself?</b></summary>
 
-LinkedIn's terms restrict automation. This project only reads, in the person's own logged-in browser, screens that they would see themselves. Use at your own risk.
+No. LinkedIn messages and emails are always drafts. The only action it may take on its own is applying on a job platform (Gupy, the company's site), and only when the job passes every rule (75% fit or more and no deal-breaker). Management jobs are always left for you to decide.
+</details>
 
-## Contributing
+<details>
+<summary><b>Does it work for a stack other than Magento?</b></summary>
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and the [ROADMAP.md](ROADMAP.md). Run the tests with `python3 -m pytest`.
+Yes. `/build-company-list` asks for the technology and the country and builds `empresas-<technology>-<country>.xlsx`, and the agent rules are generic. Magento / Adobe Commerce is just the author's use case.
+</details>
+
+<details>
+<summary><b>How much does it cost in tokens?</b></summary>
+
+It runs on your own Claude Code account, and usage depends on your plan and on how many pages each company needs. That is why the work is split into rounds of 10 companies, and RTK trims terminal output before it reaches the model. The project itself costs nothing.
+</details>
+
+<details>
+<summary><b>Does my data go anywhere?</b></summary>
+
+Your profile, spreadsheets, drafts, reports and résumés stay on your computer (they are in `.gitignore`). The project has no server. What Claude Code reads to do the work goes through Anthropic, as with any Claude Code use, and browsing happens in your own Chrome.
+</details>
+
+<details>
+<summary><b>Does it work on Windows?</b></summary>
+
+In beta. `install.ps1` runs on PowerShell 5.1 and 7, copies the skills (Windows needs special permission for symbolic links) and is tested on every push with GitHub Actions (`windows-latest`), together with macOS and Linux. The skills themselves have not been used on a real Windows machine yet; if something breaks, [open an issue](https://github.com/roni-clei-santos/ai-company-prospector/issues).
+</details>
+
+## Notice
+
+LinkedIn's terms restrict automation. This project only reads, in the person's own logged-in browser, screens they would see themselves. Use it at your own risk.
+
+## Stars and contributors
+
+<a href="https://star-history.com/#roni-clei-santos/ai-company-prospector&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date&theme=dark">
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date">
+    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=roni-clei-santos/ai-company-prospector&type=Date" width="100%">
+  </picture>
+</a>
+
+<a href="https://github.com/roni-clei-santos/ai-company-prospector/graphs/contributors">
+  <img alt="Contributors" src="https://contrib.rocks/image?repo=roni-clei-santos/ai-company-prospector">
+</a>
+
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) and the [ROADMAP.md](ROADMAP.md). Run the tests with `python3 -m pytest`.
 
 ## Author
 
 Made by **Roni Clei J. Santos**, Adobe Commerce / Magento developer: [linkedin.com/in/roni-clei-santos](https://www.linkedin.com/in/roni-clei-santos/).
 
-If this project helped you find a company (or stop job-hunting in the dark), **leave a ⭐** on the repository. It helps other people find it.
+If this project helped you find a company (or stop looking for jobs in the dark), **leave a ⭐**. It helps other people find the project.
 
 [MIT](LICENSE) license.

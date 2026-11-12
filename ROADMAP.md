@@ -5,7 +5,7 @@ Ideias para as próximas versões. Sugestões são bem-vindas (abra uma issue).
 ## Próximas
 
 - [ ] Versão em inglês das skills, do PROMPT e dos guias
-- [ ] Suporte a Linux e Windows
+- [ ] Windows: sair do beta depois de uso real das skills (o instalador já roda no GitHub Actions)
 - [ ] `/build-company-list` com mais plataformas prontas (VTEX, Shopify Plus, SAP Commerce, Salesforce Commerce Cloud) e exemplos de diretórios oficiais.
 - [ ] Versão em espanhol das skills, do PROMPT e dos guias.
 - [ ] Painel: filtro por tipo de empresa e por "Serve para".
@@ -23,4 +23,4 @@ Ideias para as próximas versões. Sugestões são bem-vindas (abra uma issue).
 - [x] `/build-company-list` e `/next-companies` como skills no repositório.
 - [x] Status sem data no texto, data de corte gravada e migração automática.
 - [x] Painel automático por rodada e demo no GitHub Pages.
-- [x] Instalador idempotente para macOS.
+- [x] Instaladores idempotentes para macOS e Linux (`install.sh`) e Windows (`install.ps1`, beta), com testes no GitHub Actions nos 3 sistemas.

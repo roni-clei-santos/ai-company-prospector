@@ -23,3 +23,6 @@ docs/_tmp/
 
 # Local alias of PROMPT-prospeccao.md (symlink; not portable to Windows)
 PROMPT-prospeccao-magento.md
+
+# Local study notes (not published)
+docs/_estudo-readme.md
