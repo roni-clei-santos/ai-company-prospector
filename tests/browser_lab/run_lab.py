@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Browser lab driver (Selenium 4). Runs ONLY in GitHub Actions (.github/workflows/browser-lab.yml).
+"""Browser lab: the REAL panel (painel/index.html + scripts/servidor_painel.py) over a fictitious project,
+in real headed browsers (Selenium 4). Runs ONLY in GitHub Actions (.github/workflows/browser-lab.yml).
 
-For each browser: scenarios ARQUIVO, ARQUIVO_RECARREGAR, ARQUIVO_OUTRA_PASTA, HTTP (session 1, fixed
-profile), then ARQUIVO_REABRIR, HTTP_REABRIR and PAINEL_REAL_HTTP (session 2, same profile).
-Writes <out>/results.json, <out>/server-log.json and screenshots <so>-<navegador>-<cenario>.png.
+Scenarios (each one in a fresh project and, where the browser allows it, a fresh profile):
+  A  file:// with the server ON:  Feito records, Desfazer reverts, "Relatório da empresa" opens
+  B  file:// with the server OFF: Feito shows "Vou salvar..."; server on + reload -> recorded in <= 15 s
+  C  http://127.0.0.1:          Feito, Desfazer and "Relatório da empresa"
+  D  audit of every clickable element of tests/browser_lab/inventario.md (http)
+Safari: its WebDriver does not open file:// pages, so A and B open the page with `open -a Safari` and
+drive it with AppleScript ("do JavaScript"); C and D use safaridriver.
 
-Status of every measure: "ok", "falha" (browser result) or "ambiente" (the test could not run).
-Exit code 0 whenever it measured; != 0 only if the lab itself broke (exception in this script).
+Status: "ok", "falha" (the browser/panel failed) or "ambiente" (the test could not run). An "ambiente"
+scenario runs once more; if it persists it is a warning. Exit code 1 if any scenario failed or the lab
+itself broke, else 0. Writes <out>/results.json and screenshots <so>-<navegador>-<cenario>.png.
 Usage: python tests/browser_lab/run_lab.py --so macos --browsers safari,chrome,edge,firefox,brave --out results
 """
 import argparse
@@ -14,14 +20,11 @@ import json
 import os
 import platform
 import re
-import secrets
 import shutil
-import socket
 import stat
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import traceback
 import urllib.request
@@ -30,38 +33,26 @@ from pathlib import Path
 
 import selenium
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.common.by import By
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-PROBE = HERE / "probe"
 sys.path.insert(0, str(HERE))
-import probe_server  # noqa: E402
+sys.path.insert(0, str(REPO / "scripts"))
+import projeto_lab  # noqa: E402
 
-PORT = 47321
-TIMEOUT = 30          # seconds per scenario
-VALOR = '["teste-1"]'
 SYSTEM = platform.system()  # Darwin / Windows / Linux
-
-MEDIDAS = ("arquivo_grava", "arquivo_guarda", "arquivo_reabrir", "arquivo_outro",
-           "http_grava", "http_reabrir", "painel_feito", "painel_desfazer")
-
-
-class LabError(Exception):
-    """The test could not run (environment), as opposed to a browser result."""
+SCENARIOS = ("A", "B", "C", "D")
+QUEUE_KEY = "painel-fila-v1"
 
 
-def ok(detalhe=""):
-    return {"status": "ok", "motivo": "", "detalhe": detalhe}
+class Ambiente(Exception):
+    """The test could not run (driver, browser, permission of the runner): not a browser result."""
 
 
-def falha(motivo, detalhe=""):
-    return {"status": "falha", "motivo": motivo, "detalhe": detalhe or motivo}
-
-
-def ambiente(motivo, detalhe=""):
-    return {"status": "ambiente", "motivo": motivo, "detalhe": detalhe or motivo}
+class Falha(Exception):
+    """The panel did not do what it should."""
 
 
 def first_line(e):
@@ -69,7 +60,79 @@ def first_line(e):
     return text.splitlines()[0][:300] if text else type(e).__name__
 
 
-# ---------------------------------------------------------------- browsers on disk
+def wait(fn, secs, step=0.4):
+    end = time.time() + secs
+    last = None
+    while time.time() < end:
+        try:
+            last = fn()
+            if last:
+                return last
+        except (WebDriverException, IndexError, KeyError, ValueError, OSError):
+            pass
+        time.sleep(step)
+    return last
+
+
+# ---------------------------------------------------------------- fictitious project + real server
+class Projeto:
+    def __init__(self, tmp_root, nome):
+        self.root = Path(tempfile.mkdtemp(prefix=f"painel-{nome}-", dir=tmp_root))
+        projeto_lab.criar(self.root)
+        self.env = dict(os.environ, PROSPECT_DIR=str(self.root),
+                        AI_PROSPECTOR_PROJETO_ARQUIVO=str(self.root / "controle" / ".projeto-lab"))
+        self.proc = None
+        self.port = None
+        out = subprocess.run([sys.executable, str(REPO / "scripts" / "gerar_painel.py"), "--no-open"],
+                             cwd=str(self.root), env=self.env, capture_output=True, text=True, timeout=120)
+        if out.returncode != 0:
+            raise Ambiente(f"gerar_painel.py falhou: {(out.stderr or out.stdout)[-400:]}")
+        self.index = self.root / "painel" / "index.html"
+
+    @property
+    def token(self):
+        return (self.root / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
+
+    def start(self):
+        log = open(self.root / "controle" / "servidor-lab.log", "ab")
+        self.proc = subprocess.Popen([sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(self.root)],
+                                     cwd=str(self.root), env=self.env, stdout=log, stderr=log)
+
+        def up():
+            state = json.loads((self.root / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))
+            req = urllib.request.Request(f"http://127.0.0.1:{state['porta']}/api/estado", headers={"X-Painel-Token": self.token})
+            with urllib.request.urlopen(req, timeout=2) as r:
+                return state["porta"] if r.status == 200 else None
+        self.port = wait(up, 30)
+        if not self.port:
+            raise Ambiente("servidor_painel.py não subiu")
+        return self.port
+
+    def stop(self):
+        if self.proc:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+            self.proc = None
+
+    def progresso(self):
+        return json.loads((self.root / "controle" / "progresso.json").read_text(encoding="utf-8"))
+
+    def feitos(self):
+        try:
+            data = json.loads((self.root / "controle" / "painel-feitos.json").read_text(encoding="utf-8"))
+        except OSError:
+            return set()
+        return {f["id"] for f in data.get("feitos", [])}
+
+    @property
+    def http(self):
+        return f"http://127.0.0.1:{self.port}/index.html"
+
+
+# ---------------------------------------------------------------- browsers on disk / drivers
 def find_binary(nav):
     pf = os.environ.get("ProgramFiles", r"C:\Program Files")
     pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
@@ -95,14 +158,10 @@ def find_binary(nav):
             "firefox": [shutil.which("firefox") or ""],
         },
     }.get(SYSTEM, {})
-    for c in cands.get(nav, []):
-        if c and Path(c).exists():
-            return c
-    return None
+    return next((c for c in cands.get(nav, []) if c and Path(c).exists()), None)
 
 
 def brave_version(binary):
-    """(raw version, Chromium major) read from the Brave binary on disk (e.g. '131.1.73.89' -> 131)."""
     raw = ""
     if SYSTEM == "Windows":
         names = [p.name for p in Path(binary).parent.iterdir() if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", p.name)]
@@ -113,77 +172,107 @@ def brave_version(binary):
         except (OSError, subprocess.SubprocessError) as e:
             raw = f"--version falhou: {e}"
     m = re.search(r"(\d+)\.(\d+)\.(\d+)\.(\d+)", raw)
-    major = int(m.group(1)) if m and int(m.group(1)) >= 70 else None
-    return raw, major
+    return raw, (int(m.group(1)) if m and int(m.group(1)) >= 70 else None)
 
 
 def chromedriver_for(major, dest):
-    """Download the Chrome for Testing chromedriver of this Chromium milestone. Returns (path, version)."""
     plat = {"Windows": "win64", "Linux": "linux64"}.get(SYSTEM)
     if SYSTEM == "Darwin":
         plat = "mac-arm64" if platform.machine() == "arm64" else "mac-x64"
     url = "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json"
     with urllib.request.urlopen(url, timeout=60) as r:
-        data = json.loads(r.read().decode("utf-8"))
-    ms = data.get("milestones", {}).get(str(major))
+        ms = json.loads(r.read().decode("utf-8")).get("milestones", {}).get(str(major))
     if not ms:
-        raise LabError(f"Chrome for Testing sem chromedriver para o Chromium {major}")
+        raise Ambiente(f"Chrome for Testing sem chromedriver para o Chromium {major}")
     link = next((d["url"] for d in ms["downloads"].get("chromedriver", []) if d["platform"] == plat), None)
     if not link:
-        raise LabError(f"Chrome for Testing sem chromedriver {plat} para o Chromium {major}")
+        raise Ambiente(f"sem chromedriver {plat} para o Chromium {major}")
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
-    zpath = dest / "chromedriver.zip"
     with urllib.request.urlopen(link, timeout=120) as r:
-        zpath.write_bytes(r.read())
-    with zipfile.ZipFile(zpath) as z:
+        (dest / "cd.zip").write_bytes(r.read())
+    with zipfile.ZipFile(dest / "cd.zip") as z:
         z.extractall(dest)
     exe = next(p for p in dest.rglob("chromedriver*") if p.is_file() and p.suffix in ("", ".exe"))
     exe.chmod(exe.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return str(exe), ms["version"]
 
 
-# ---------------------------------------------------------------- drivers
-def start_driver(nav, profile, binary, brave_driver=None):
-    if nav in ("chrome", "edge", "brave"):
-        opts = webdriver.EdgeOptions() if nav == "edge" else webdriver.ChromeOptions()
-        opts.binary_location = binary
-        for a in ("--no-first-run", "--no-default-browser-check", f"--user-data-dir={profile}", "--window-size=1280,900"):
-            opts.add_argument(a)
-        opts.set_capability("ms:loggingPrefs" if nav == "edge" else "goog:loggingPrefs", {"browser": "ALL"})
-        if nav == "edge":
-            return webdriver.Edge(options=opts)
-        service = webdriver.ChromeService(executable_path=brave_driver) if brave_driver else webdriver.ChromeService()
-        return webdriver.Chrome(options=opts, service=service)
-    if nav == "firefox":
-        opts = webdriver.FirefoxOptions()
-        opts.binary_location = binary
-        opts.add_argument("-profile")
-        opts.add_argument(str(profile))
-        return webdriver.Firefox(options=opts)
-    if nav == "safari":
-        return webdriver.Safari()
-    raise ValueError(f"navegador desconhecido: {nav}")
+class Navegador:
+    def __init__(self, nav, tmp_root):
+        self.nav, self.tmp_root = nav, tmp_root
+        self.binary = find_binary(nav)
+        self.versao = None
+        self.brave_driver = None
+        if not self.binary:
+            raise Ambiente("não instalado")
+        if nav == "brave":
+            raw, major = brave_version(self.binary)
+            self.brave_raw = raw
+            if major is None:
+                raise Ambiente(f"versão do Chromium do Brave não lida: {raw!r}")
+            try:
+                self.brave_driver, drv = chromedriver_for(major, Path(tmp_root) / "brave-driver")
+            except Ambiente:
+                raise
+            except Exception as e:  # noqa: BLE001
+                raise Ambiente(f"chromedriver p/ Chromium {major}: {first_line(e)}") from e
+            if drv.split(".")[0] != str(major):
+                raise Ambiente(f"Brave Chromium {major} x chromedriver {drv}")
+        if nav == "safari":
+            try:
+                self.versao = subprocess.run(["defaults", "read", "/Applications/Safari.app/Contents/Info",
+                                              "CFBundleShortVersionString"], capture_output=True, text=True,
+                                             timeout=15).stdout.strip() or None
+            except (OSError, subprocess.SubprocessError):
+                pass
+
+    def driver(self):
+        """A new WebDriver session with a FRESH profile (Safari: a new session, which starts empty)."""
+        nav = self.nav
+        try:
+            if nav in ("chrome", "edge", "brave"):
+                opts = webdriver.EdgeOptions() if nav == "edge" else webdriver.ChromeOptions()
+                opts.binary_location = self.binary
+                profile = tempfile.mkdtemp(prefix=f"perfil-{nav}-", dir=self.tmp_root)
+                for a in ("--no-first-run", "--no-default-browser-check", f"--user-data-dir={profile}", "--window-size=1280,900"):
+                    opts.add_argument(a)
+                opts.set_capability("ms:loggingPrefs" if nav == "edge" else "goog:loggingPrefs", {"browser": "ALL"})
+                if nav == "edge":
+                    drv = webdriver.Edge(options=opts)
+                else:
+                    service = webdriver.ChromeService(executable_path=self.brave_driver) if self.brave_driver else webdriver.ChromeService()
+                    drv = webdriver.Chrome(options=opts, service=service)
+            elif nav == "firefox":
+                opts = webdriver.FirefoxOptions()
+                opts.binary_location = self.binary
+                opts.add_argument("-profile")
+                opts.add_argument(tempfile.mkdtemp(prefix="perfil-firefox-", dir=self.tmp_root))
+                drv = webdriver.Firefox(options=opts)
+                drv.set_window_size(1280, 900)
+            elif nav == "safari":
+                drv = webdriver.Safari()
+                drv.set_window_size(1280, 900)
+            else:
+                raise ValueError(nav)
+        except WebDriverException as e:
+            raise Ambiente(f"driver não iniciou: {first_line(e)}") from e
+        caps = drv.capabilities
+        v = caps.get("browserVersion") or caps.get("version")
+        self.versao = f"{self.brave_raw} (Chromium {v})" if nav == "brave" else (self.versao if nav == "safari" and self.versao else v)
+        drv.set_page_load_timeout(30)
+        return drv
 
 
 def quit_driver(drv):
     try:
         drv.quit()
-    except Exception:  # noqa: BLE001 - closing a broken session is not a result
+    except Exception:  # noqa: BLE001
         pass
 
 
-def console_logs(drv, nav):
-    if nav not in ("chrome", "edge", "brave"):
-        return None  # Firefox / Safari drivers have no console log API; page errors are in __lab.erros
-    try:
-        return [f"{e.get('level')}: {e.get('message')}" for e in drv.get_log("browser")]
-    except Exception as e:  # noqa: BLE001
-        return [f"(sem log: {first_line(e)})"]
-
-
 def screen_capture(path):
-    """Whole-screen capture (shows browser UI such as permission prompts, which WebDriver screenshots miss)."""
+    """Whole screen (shows browser UI such as permission prompts)."""
     try:
         if SYSTEM == "Darwin":
             subprocess.run(["screencapture", "-x", str(path)], timeout=15, capture_output=True)
@@ -201,440 +290,478 @@ def screen_capture(path):
         pass
 
 
-# ---------------------------------------------------------------- scenarios
-class Ctx:
-    def __init__(self, so, nav, out, server):
-        self.so, self.nav, self.out, self.server = so, nav, Path(out), server
+# ---------------------------------------------------------------- page driver (WebDriver or Safari+AppleScript)
+class Pagina:
+    """Uniform access to the open panel page: js(), click(css), open(url), reload()."""
 
-    def shot(self, drv, cenario):
-        name = f"{self.so}-{self.nav}-{cenario}.png"
+    def __init__(self, drv=None):
+        self.drv = drv
+
+    def open(self, url):
         try:
-            drv.save_screenshot(str(self.out / name))
+            self.drv.get(url)
+        except WebDriverException as e:
+            raise Ambiente(f"driver não abriu {url[:60]}: {first_line(e)}") from e
+
+    def reload(self):
+        self.drv.refresh()
+
+    def js(self, code):
+        return self.drv.execute_script("return (function(){ " + code + " })()")
+
+    def click(self, css, index=0):
+        """Real (native) click on the element; scrolls it to the middle of the window first."""
+        els = self.drv.find_elements(By.CSS_SELECTOR, css)
+        if len(els) <= index:
+            raise Falha(f"não achei {css}")
+        el = els[index]
+        self.drv.execute_script("arguments[0].scrollIntoView({block:'center'})", el)
+        time.sleep(0.2)
+        try:
+            el.click()
+        except WebDriverException as e:
+            raise Falha(f"clique em {css} falhou: {first_line(e)}") from e
+
+    def shot(self, path):
+        try:
+            self.drv.save_screenshot(str(path))
+        except Exception:  # noqa: BLE001
+            screen_capture(path)
+
+    def console(self, nav):
+        if nav not in ("chrome", "edge", "brave"):
+            return None
+        try:
+            return [f"{e.get('level')}: {e.get('message')}" for e in self.drv.get_log("browser")][-30:]
         except Exception:  # noqa: BLE001
             return None
-        return name
-
-    def posts_since(self, idx):
-        with self.server.lock:
-            return [e for e in self.server.entries[idx:] if e["metodo"] in ("POST", "OPTIONS")]
 
 
-def page_scenario(ctx, drv, cenario, url=None, reload=False):
-    """Open (or reload) a probe page and wait up to TIMEOUT s for window.__lab.fim."""
-    with ctx.server.lock:
-        idx = len(ctx.server.entries)
-    t0 = time.time()
-    res = {"cenario": cenario, "url": url or "(recarregar)"}
-    try:
-        drv.set_page_load_timeout(TIMEOUT)
-        if reload:
-            drv.refresh()
-        else:
-            drv.get(url)
-    except WebDriverException as e:
-        res.update(ambiente("driver não abriu a página", first_line(e)))
-        res["screenshot"] = ctx.shot(drv, cenario)
-        return res
-    lab, captured = None, False
-    while time.time() - t0 < TIMEOUT:
-        try:
-            lab = drv.execute_script("return window.__lab || null")
-        except WebDriverException as e:
-            res.update(ambiente("driver não leu a página", first_line(e)))
-            break
-        if lab and lab.get("fim"):
-            break
-        if not captured and time.time() - t0 > 8:  # still waiting: capture the whole screen (prompts)
-            screen_capture(ctx.out / f"{ctx.so}-{ctx.nav}-{cenario}-tela.png")
-            captured = True
-        time.sleep(0.5)
-    if not captured:
-        screen_capture(ctx.out / f"{ctx.so}-{ctx.nav}-{cenario}-tela.png")
-    res["lab"] = lab
-    res["segundos"] = round(time.time() - t0, 1)
-    res["servidor"] = ctx.posts_since(idx)
-    res["screenshot"] = ctx.shot(drv, cenario)
-    res["console"] = console_logs(drv, ctx.nav)
-    if "status" not in res and not lab:
-        # the probe page never ran: did the driver even reach the URL?
-        try:
-            res["url_atual"] = drv.current_url
-        except WebDriverException as e:
-            res["url_atual"] = f"(erro: {first_line(e)})"
-        target = url or res.get("url_atual") or ""
-        if not reload and not str(res["url_atual"]).startswith(target.split("#")[0]):
-            res.update(ambiente("driver não navegou até a página", f"url atual: {res['url_atual']}"))
-    if "status" not in res:
-        res.update(ok() if lab and lab.get("fim") else falha("página não terminou em 30 s"))
-    return res
+class SafariApple(Pagina):
+    """The user's own Safari, opened with `open -a Safari` and driven with AppleScript "do JavaScript"
+    (safaridriver does not open file:// pages). Clicks are DOM clicks (element.click())."""
 
+    def open(self, url):
+        quit_safari()
+        p = subprocess.run(["open", "-a", "Safari", url], capture_output=True, text=True, timeout=30)
+        if p.returncode != 0:
+            raise Ambiente(f"open -a Safari falhou: {(p.stderr or p.stdout).strip()[:200]}")
+        if not wait(lambda: self.js("return document.readyState") == "complete", 20):
+            raise Ambiente("Safari não respondeu ao AppleScript (do JavaScript): " + self.last_error)
 
-# ---------------------------------------------------------------- Safari as a person opens it (`open -a Safari`)
-def relatos_since(server, idx):
-    with server.lock:
-        return [e for e in server.entries[idx:] if e["metodo"] == "GET" and e["caminho"].startswith("/relato")]
+    last_error = ""
 
+    def js(self, code):
+        src = "JSON.stringify((function(){ " + code + " })())"
+        script = 'tell application "Safari" to do JavaScript "' + src.replace("\\", "\\\\").replace('"', '\\"') + \
+                 '" in current tab of front window'
+        p = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=20)
+        if p.returncode != 0:
+            SafariApple.last_error = p.stderr.strip()[:300]
+            if re.search(r"Allow JavaScript from Apple Events|not allowed|Not authori[sz]ed|-1743", p.stderr, re.I):
+                raise Ambiente("Safari não permite JavaScript por Apple Events: " + SafariApple.last_error)
+            raise OSError(SafariApple.last_error)
+        out = p.stdout.strip()
+        return json.loads(out) if out and out != "missing value" else None
 
-def safari_open_scenario(ctx, cenario, url):
-    """Open the URL in the user's Safari (not a WebDriver session); the page reports __lab to /relato."""
-    from urllib.parse import parse_qs, urlparse
-    with ctx.server.lock:
-        idx = len(ctx.server.entries)
-    t0 = time.time()
-    res = {"cenario": cenario, "url": url, "modo": "open -a Safari"}
-    p = subprocess.run(["open", "-a", "Safari", url], capture_output=True, text=True, timeout=30)
-    if p.returncode != 0:
-        res.update(ambiente("open -a Safari falhou", (p.stderr or p.stdout).strip()[:300]))
-        return res
-    lab = None
-    while time.time() - t0 < TIMEOUT:
-        rel = relatos_since(ctx.server, idx)
-        if rel:
-            try:
-                lab = json.loads(parse_qs(urlparse(rel[0]["caminho"]).query)["d"][0])
-            except (KeyError, ValueError, IndexError) as e:
-                res["relato_ilegivel"] = str(e)
-            break
-        time.sleep(0.5)
-    time.sleep(1)
-    name = f"{ctx.so}-{ctx.nav}-{cenario}.png"
-    screen_capture(ctx.out / name)
-    res.update({"lab": lab, "segundos": round(time.time() - t0, 1), "servidor": ctx.posts_since(idx),
-                "screenshot": name, "console": None})
-    res.update(ok() if lab and lab.get("fim") else
-               ambiente("sem relato da página em 30 s", "a página não reportou; ver o screenshot"))
-    return res
+    def reload(self):
+        self.js("location.reload(); return 1")
+        time.sleep(1)
+
+    def click(self, css, index=0):
+        ok = self.js(f"const e = document.querySelectorAll({json.dumps(css)})[{index}]; if (!e) return false; "
+                     "e.scrollIntoView({block:'center'}); e.click(); return true")
+        if not ok:
+            raise Falha(f"não achei {css}")
+
+    def shot(self, path):
+        screen_capture(path)
+
+    def console(self, nav):
+        return None
 
 
 def quit_safari():
-    time.sleep(3)  # let WebKit write localStorage to disk
-    how = "osascript quit"
+    if subprocess.run(["pgrep", "-x", "Safari"], capture_output=True).returncode != 0:
+        return
     try:
         subprocess.run(["osascript", "-e", 'quit app "Safari"'], capture_output=True, timeout=15)
     except subprocess.TimeoutExpired:
-        how = "osascript sem resposta"
-    for _ in range(20):
-        if subprocess.run(["pgrep", "-x", "Safari"], capture_output=True).returncode != 0:
-            return how
-        time.sleep(0.5)
-    subprocess.run(["pkill", "-x", "Safari"], capture_output=True)
-    time.sleep(2)
-    return how + " + pkill"
-
-
-def run_safari(res, so, out, server):
-    """Safari: file/http scenarios in the user's own Safari via `open` (WebDriver cannot open file:// and its
-    sessions start with empty storage), then the real panel in a WebDriver session (it needs clicks)."""
-    ctx = Ctx(so, "safari", out, server)
-    sc = res["cenarios"]
-    try:
-        res["versao"] = subprocess.run(["defaults", "read", "/Applications/Safari.app/Contents/Info",
-                                        "CFBundleShortVersionString"], capture_output=True, text=True,
-                                       timeout=15).stdout.strip() or None
-    except (OSError, subprocess.SubprocessError):
         pass
-    file_index = (PROBE / "index.html").as_uri()
-    file_leitor = (PROBE / "outra-pasta" / "leitor.html").as_uri()
-    http_index = f"http://127.0.0.1:{PORT}/probe/index.html"
-    subprocess.run(["pkill", "-x", "Safari"], capture_output=True)
-    time.sleep(1)
-    sc["ARQUIVO"] = safari_open_scenario(ctx, "ARQUIVO", file_index)
-    sc["ARQUIVO_RECARREGAR"] = safari_open_scenario(ctx, "ARQUIVO_RECARREGAR", file_index)  # loads it again
-    sc["ARQUIVO_OUTRA_PASTA"] = safari_open_scenario(ctx, "ARQUIVO_OUTRA_PASTA", file_leitor)
-    sc["HTTP"] = safari_open_scenario(ctx, "HTTP", http_index)
-    res["fechamento_1"] = quit_safari()
-    sc["ARQUIVO_REABRIR"] = safari_open_scenario(ctx, "ARQUIVO_REABRIR", file_index)
-    sc["HTTP_REABRIR"] = safari_open_scenario(ctx, "HTTP_REABRIR", http_index)
-    res["fechamento_2"] = quit_safari()
+    if not wait(lambda: subprocess.run(["pgrep", "-x", "Safari"], capture_output=True).returncode != 0, 10):
+        subprocess.run(["pkill", "-x", "Safari"], capture_output=True)
+        time.sleep(2)
+
+
+# ---------------------------------------------------------------- shared checks on the panel
+def panel_ready(pg, secs=30):
+    if not wait(lambda: pg.js("return document.querySelectorAll('input[data-done]').length") > 0, secs):
+        raise Falha("o painel não mostrou nenhum item com Feito")
+
+
+def status_text(pg):
+    return pg.js("const e = document.getElementById('acao-status'); return e && !e.hidden ? e.textContent : ''") or ""
+
+
+def feito_e_desfazer(pg, proj, steps):
+    """Click Feito on the first pending item, check the project; click Desfazer, check it went back."""
+    before = proj.progresso()
+    item = pg.js("const e = document.querySelector('input[data-done]'); return e ? e.getAttribute('data-done') : null")
+    if not item:
+        raise Falha("nenhum checkbox Feito")
+    if pg.js("return document.querySelector('input[data-done]').disabled"):
+        raise Falha("checkbox Feito desativado")
+    pg.click("input[data-done]")
+    if not wait(lambda: item in proj.feitos() and proj.progresso() != before, 15):
+        raise Falha(f"Feito não gravou em 15 s (status: {status_text(pg)[:80]})")
+    steps.append(f"Feito gravou {item}")
+    undo = f'[data-undo={json.dumps(item)}]'
+    if not wait(lambda: pg.js(f"return !!document.querySelector({json.dumps(undo)})"), 10):
+        raise Falha("Desfazer não apareceu em Enviados hoje")
+    pg.click(undo)
+    if not wait(lambda: item not in proj.feitos() and proj.progresso() == before, 15):
+        raise Falha("Desfazer não voltou o progresso.json em 15 s")
+    steps.append("Desfazer voltou o progresso.json")
+
+
+def relatorio(pg, steps, css="#pendentes a[data-relatorio]", tab=None):
+    """Open a report link of the panel, check the page content, go back to the panel."""
+    if tab:
+        pg.js(f"location.hash = {json.dumps(tab)}; return 1")
+        time.sleep(0.5)
+    href = pg.js(f"const a = document.querySelector({json.dumps(css)}); return a ? a.getAttribute('href') : null")
+    if not href:
+        raise Falha(f"botão de relatório ausente ({css})")
+    if not re.fullmatch(r"relatorios/[a-z0-9][a-z0-9-]*\.html", href):
+        raise Falha(f"href do relatório inesperado: {href}")
+    pg.click(css)
+    ok = wait(lambda: pg.js("const h = document.querySelector('article h1'); const b = document.querySelector('.back a');"
+                            "return h && b && document.querySelectorAll('article table, article li').length ? h.textContent : null"), 15)
+    if not ok:
+        raise Falha("a página do relatório não carregou com conteúdo")
+    if pg.js("return document.querySelectorAll('article a[href^=\"javascript\"], article b').length"):
+        raise Falha("relatório com link javascript: ou HTML cru")
+    steps.append(f"relatório abriu: {ok[:60]}")
+    pg.click(".back a")
+    panel_ready(pg, 20)
+    steps.append("Voltar ao painel funcionou")
+
+
+# ---------------------------------------------------------------- scenarios
+def cenario_a(ctx):
+    proj = Projeto(ctx.tmp, "A")
+    steps = []
     try:
-        drv = start_driver("safari", None, None)
-    except Exception as e:  # noqa: BLE001
-        sc["PAINEL_REAL_HTTP"] = {"feito": ambiente("safaridriver não iniciou", first_line(e)),
-                                  "desfazer": ambiente("safaridriver não iniciou", first_line(e))}
-    else:
-        res["versao_webdriver"] = drv.capabilities.get("browserVersion")
-        try:
-            sc["PAINEL_REAL_HTTP"] = painel_real(ctx, drv)
-        finally:
-            quit_driver(drv)
-    res["medidas"] = measures(sc)
-    return res
+        proj.start()
+        pg = ctx.page_file()
+        pg.open(proj.index.as_uri())
+        panel_ready(pg)
+        if not wait(lambda: "Marcou como Feito" in status_text(pg), 15):
+            raise Falha(f"o arquivo não falou com o servidor (status: {status_text(pg)[:80]!r})")
+        steps.append("arquivo + servidor: online")
+        feito_e_desfazer(pg, proj, steps)
+        relatorio(pg, steps)
+        return steps
+    finally:
+        ctx.finish("A")
+        proj.stop()
 
 
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def painel_real(ctx, drv):
-    """Real panel (scripts/gerar_painel.py + scripts/servidor_painel.py) over a FICTITIOUS project in a temp folder."""
-    res = {"cenario": "PAINEL_REAL_HTTP"}
-    tmp = Path(tempfile.mkdtemp(prefix="painel-lab-"))
-    env = dict(os.environ, PROSPECT_DIR=str(tmp))
-    steps = [[sys.executable, str(REPO / ".github" / "ci" / "projeto_demo.py"), str(tmp)],
-             [sys.executable, str(REPO / "scripts" / "gerar_painel.py"), "--no-open"]]
-    for cmd in steps:
-        p = subprocess.run(cmd, cwd=str(tmp), env=env, capture_output=True, text=True, timeout=120)
-        if p.returncode != 0:
-            res["feito"] = res["desfazer"] = ambiente("projeto fictício não foi gerado", (p.stderr or p.stdout)[-800:])
-            return res
-    port = free_port()
-    log = open(tmp / "servidor.log", "wb")
-    proc = subprocess.Popen([sys.executable, str(REPO / "scripts" / "servidor_painel.py"), "--raiz", str(tmp),
-                             "--porta", str(port)], cwd=str(tmp), env=env, stdout=log, stderr=log)
+def cenario_b(ctx):
+    proj = Projeto(ctx.tmp, "B")
+    steps = []
     try:
-        up = False
-        for _ in range(60):
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/estado", timeout=1) as r:
-                    up = r.status == 200
-                    break
-            except OSError:
-                time.sleep(0.5)
-        if not up:
-            res["feito"] = res["desfazer"] = ambiente("servidor_painel.py não subiu")
-            return res
-        prog = tmp / "controle" / "progresso.json"
-        load = lambda: json.loads(prog.read_text(encoding="utf-8"))  # noqa: E731
-        before = load()
-        url = f"http://127.0.0.1:{port}/index.html"
-        res["url"] = url
-        try:
-            drv.set_page_load_timeout(TIMEOUT)
-            drv.get(url)
-        except WebDriverException as e:
-            res["feito"] = res["desfazer"] = ambiente("driver não abriu o painel", first_line(e))
-            return res
+        pg = ctx.page_file()
+        pg.open(proj.index.as_uri())
+        panel_ready(pg)
+        pg.js(f"localStorage.removeItem('{QUEUE_KEY}'); return 1")
+        pg.reload()
+        panel_ready(pg)
+        before = proj.progresso()
+        item = pg.js("return document.querySelector('input[data-done]').getAttribute('data-done')")
+        if pg.js("return document.querySelector('input[data-done]').disabled"):
+            raise Falha("checkbox Feito desativado sem servidor")
+        pg.click("input[data-done]")
+        msg = wait(lambda: status_text(pg) if "Vou salvar" in status_text(pg) else None, 12)
+        if not msg:
+            raise Falha(f"sem a mensagem 'Vou salvar…' (status: {status_text(pg)[:80]!r})")
+        steps.append(f"sem servidor: {msg.strip()[:90]}")
+        if not pg.js(f"return !!document.querySelector('[data-undo={json.dumps(item)}]')"):
+            raise Falha("o item não foi para Enviados hoje na tela")
+        if proj.progresso() != before:
+            raise Falha("gravou sem servidor?")
+        proj.start()
+        pg.reload()
+        if not wait(lambda: item in proj.feitos() and proj.progresso() != before, 15):
+            raise Falha("ligou o servidor e recarregou: o Feito não foi salvo em 15 s")
+        if not wait(lambda: pg.js(f"return JSON.parse(localStorage.getItem('{QUEUE_KEY}') || '[]').length") == 0, 10):
+            raise Falha("a fila não esvaziou depois de salvar")
+        steps.append(f"servidor ligado + recarregar: {item} salvo e fila vazia")
+        return steps
+    finally:
+        ctx.finish("B")
+        proj.stop()
 
-        def wait(fn, secs):
-            end = time.time() + secs
-            while time.time() < end:
-                try:
-                    v = fn()
-                    if v:
-                        return v
-                except (WebDriverException, IndexError):  # IndexError: element not there yet
-                    pass
-                time.sleep(0.4)
+
+def cenario_c(ctx):
+    proj = Projeto(ctx.tmp, "C")
+    steps = []
+    try:
+        proj.start()
+        pg = ctx.page_http()
+        pg.open(proj.http)
+        panel_ready(pg)
+        feito_e_desfazer(pg, proj, steps)
+        relatorio(pg, steps)
+        return steps
+    finally:
+        ctx.finish("C")
+        proj.stop()
+
+
+EXTERNAL = {"Abrir perfil", "Abrir Rascunhos do Gmail", "Abrir a vaga", "LinkedIn", "GitHub", "Dar uma estrela no projeto"}
+CLASSIFY = """
+const cat = el => {
+  if (el.matches('nav.tabs a')) return 'aba';
+  if (el.matches('button.chip[data-jump]')) return 'chip';
+  if (el.matches('button[data-copy]')) return 'copiar';
+  if (el.matches('details.after > summary')) return 'outra-versao';
+  if (el.matches('details.seal > summary')) return 'ver-detalhes';
+  if (el.matches('input[data-done]')) return 'feito';
+  if (el.matches('button[data-undo]')) return 'desfazer';
+  if (el.matches('#pendentes a[data-relatorio]')) return 'relatorio-empresa';
+  if (el.matches('#rodada a[data-relatorio]')) return 'relatorio-rodada';
+  if (el.matches('button.toggle')) return 'ver-tabela';
+  if (el.matches('a[target="_blank"]')) return 'externo';
+  return null;
+};
+return [...document.querySelectorAll('a, button, summary, input, select, textarea, [onclick], [role=button]')]
+  .map(el => ({cat: cat(el), text: (el.textContent || el.value || '').trim().slice(0, 60),
+               href: el.getAttribute('href'), target: el.getAttribute('target'), rel: el.getAttribute('rel'),
+               html: el.outerHTML.slice(0, 120)}));
+"""
+
+
+def cenario_d(ctx):
+    """Audit: every clickable element of every tab, header and footer (inventario.md)."""
+    proj = Projeto(ctx.tmp, "D")
+    steps, bad = [], []
+    try:
+        proj.start()
+        pg = ctx.page_http()
+        pg.open(proj.http)
+        panel_ready(pg)
+        els = pg.js(CLASSIFY)
+        cats = {}
+        for e in els:
+            if e["cat"] is None:
+                bad.append(f"clicável fora do inventário: {e['html']}")
+            cats.setdefault(e["cat"], []).append(e)
+        for need in ("aba", "chip", "copiar", "outra-versao", "feito", "relatorio-empresa", "relatorio-rodada", "ver-tabela", "externo"):
+            if not cats.get(need):
+                bad.append(f"nenhum elemento '{need}' no painel fictício")
+        # external links: never clicked in CI
+        for e in cats.get("externo", []):
+            if e["text"] not in EXTERNAL:
+                bad.append(f"link externo sem item no inventário: {e['text']!r}")
+            if not re.match(r"^https://\S+$", e["href"] or ""):
+                bad.append(f"{e['text']}: href não é https absoluto ({e['href']!r})")
+            if e["target"] != "_blank" or "noopener" not in (e["rel"] or "").split():
+                bad.append(f"{e['text']}: falta target=_blank ou rel=noopener")
+        steps.append(f"{len(cats.get('externo', []))} links externos conferidos (href/target/rel)")
+        # tabs
+        for tab in ("rodada", "projeto", "responderam", "followups", "pendentes"):
+            pg.click(f'nav.tabs a[href="#{tab}"]')
+            if not wait(lambda: pg.js(f"return !document.getElementById('{tab}').hidden && "
+                                      "[...document.querySelectorAll('main > section')].filter(s => !s.hidden).length === 1"), 5):
+                bad.append(f"aba {tab} não abriu")
+        steps.append("5 abas")
+        # chips
+        for target in pg.js("return [...document.querySelectorAll('button.chip[data-jump]')].map(b => b.getAttribute('data-jump'))"):
+            pg.js("window.scrollTo(0, 0); return 1")
+            pg.click(f'button.chip[data-jump="{target}"]')
+            if not wait(lambda: pg.js(f"const r = document.getElementById('{target}').getBoundingClientRect(); "
+                                      "return r.top >= -5 && r.top < window.innerHeight"), 5):
+                bad.append(f"chip {target} não levou à seção")
+        steps.append("chips")
+        # copy (first message) + "Outra versão" + its copy
+        expected = pg.js("return document.querySelector('#p-linkedin ~ .list .msg').textContent")
+        pg.click("#p-linkedin ~ .list button[data-copy]")
+        label = wait(lambda: pg.js("const b = document.querySelector('#p-linkedin ~ .list button[data-copy]'); "
+                                   "return /Copiado|Não copiou/.test(b.textContent) ? b.textContent : null"), 3)
+        if label != "Copiado ✓":
+            bad.append(f"Copiar texto: {label!r}")
+        clip = ctx.read_clipboard(pg)
+        if clip is not None and clip != expected:
+            bad.append("Copiar texto: a área de transferência não tem o texto da mensagem")
+        steps.append("copiar: " + (label or "?") + ("" if clip is None else " (conferido na área de transferência)"))
+        pg.click("details.after > summary")
+        if not wait(lambda: pg.js("return document.querySelector('details.after').open"), 3):
+            bad.append("Outra versão não abriu")
+        pg.click("details.after button[data-copy]")
+        if wait(lambda: pg.js("return document.querySelector('details.after button[data-copy]').textContent"), 3) not in ("Copiado ✓",):
+            bad.append("Copiar da outra versão não confirmou")
+        if cats.get("ver-detalhes"):
+            pg.click("details.seal > summary")
+            if not pg.js("return document.querySelector('details.seal').open"):
+                bad.append("ver detalhes da conferência não abriu")
+        # Feito / Desfazer on one item of each list
+        for group in ("p-hoje", "p-linkedin", "p-emails", "p-decisoes"):
+            css = f"#{group} + .list input[data-done], #{group} ~ .list input[data-done]"
+            item = pg.js(f"const g = document.getElementById('{group}'); let n = g.nextElementSibling; "
+                         "const e = n && n.querySelector('input[data-done]'); return e ? e.getAttribute('data-done') : null")
+            if not item:
+                bad.append(f"{group}: sem item com Feito")
+                continue
+            before = proj.progresso()
+            pg.click(f'input[data-done={json.dumps(item)}]')
+            if not wait(lambda: item in proj.feitos() and proj.progresso() != before, 15):
+                bad.append(f"Feito em {group} não gravou")
+                continue
+            undo = f'[data-undo={json.dumps(item)}]'
+            wait(lambda: pg.js(f"return !!document.querySelector({json.dumps(undo)})"), 10)
+            pg.click(undo)
+            if not wait(lambda: item not in proj.feitos() and proj.progresso() == before, 15):
+                bad.append(f"Desfazer em {group} não voltou")
+            panel_ready(pg)
+        steps.append("Feito + Desfazer em Fazer hoje, LinkedIn, E-mails e Decisões")
+        # charts: Ver tabela / Ver gráfico
+        pg.click('nav.tabs a[href="#projeto"]')
+        n = pg.js("return document.querySelectorAll('#projeto button.toggle').length")
+        for i in range(n):
+            pg.click("#projeto button.toggle", i)
+            if not pg.js(f"const c = document.querySelectorAll('#projeto button.toggle')[{i}].closest('.card'); "
+                         "return c.classList.contains('show-table') && c.querySelector('.tbl-view table').offsetHeight > 0"):
+                bad.append(f"Ver tabela {i + 1} não mostrou a tabela")
+            pg.click("#projeto button.toggle", i)
+            if pg.js(f"return document.querySelectorAll('#projeto button.toggle')[{i}].closest('.card').classList.contains('show-table')"):
+                bad.append(f"Ver gráfico {i + 1} não voltou")
+        steps.append(f"{n} botões Ver tabela")
+        # reports: company (Pendentes) and round (Última rodada)
+        pg.click('nav.tabs a[href="#pendentes"]')
+        try:
+            relatorio(pg, steps)
+            relatorio(pg, steps, "#rodada a[data-relatorio]", tab="#rodada")
+        except Falha as e:
+            bad.append(str(e))
+        if bad:
+            raise Falha("; ".join(bad))
+        return steps
+    finally:
+        ctx.finish("D")
+        proj.stop()
+
+
+# ---------------------------------------------------------------- per browser
+class Ctx:
+    def __init__(self, so, nav, out, tmp, browser):
+        self.so, self.nav, self.out, self.tmp, self.browser = so, nav, Path(out), tmp, browser
+        self.pg = None
+
+    def page_file(self):
+        if self.nav == "safari":
+            self.pg = SafariApple()
+        else:
+            self.pg = Pagina(self.browser.driver())
+        return self.pg
+
+    def page_http(self):
+        self.pg = Pagina(self.browser.driver())
+        return self.pg
+
+    def read_clipboard(self, pg):
+        """Text in the clipboard when the browser lets the page read it (None otherwise)."""
+        if isinstance(pg, SafariApple) or not pg.drv:
+            return None
+        try:
+            return pg.drv.execute_async_script(
+                "const done = arguments[arguments.length - 1];"
+                "if (!navigator.clipboard || !navigator.clipboard.readText) return done(null);"
+                "navigator.clipboard.readText().then(done, () => done(null)); setTimeout(() => done(null), 3000);")
+        except WebDriverException:
             return None
 
-        cb = wait(lambda: drv.find_elements(By.CSS_SELECTOR, "#app input[data-done], input[data-done]")[0], TIMEOUT)
-        if cb is None:
-            res["screenshot"] = ctx.shot(drv, "PAINEL_REAL_HTTP")
-            res["feito"] = res["desfazer"] = falha("nenhum checkbox Feito na aba Pendentes")
-            return res
-        res["item"] = cb.get_attribute("data-done")
-        res["modo_pagina"] = drv.execute_script(
-            "return (document.querySelector('.mode-line')||{}).textContent || null")
-        if not cb.is_enabled():
-            res["screenshot"] = ctx.shot(drv, "PAINEL_REAL_HTTP")
-            res["feito"] = falha("checkbox Feito desativado", res["modo_pagina"] or "")
-            res["desfazer"] = falha("sem Feito, não há o que desfazer")
-            return res
-        drv.execute_script("arguments[0].scrollIntoView({block:'center'})", cb)
-        try:
-            cb.click()
-        except WebDriverException as e:
-            res["clique"] = f"clique nativo falhou ({first_line(e)}); clique pelo label"
-            drv.execute_script("arguments[0].closest('label').click()", cb)
-        undo = wait(lambda: drv.find_elements(By.CSS_SELECTOR, "[data-undo]")[0], 15)
-        status_txt = drv.execute_script("return (document.getElementById('acao-status')||{}).textContent || ''")
-        after = load()
-        res["status_feito"] = status_txt
-        res["screenshot"] = ctx.shot(drv, "PAINEL_REAL_HTTP")
-        if after != before and undo is not None:
-            res["feito"] = ok(f"progresso.json mudou ({len(before.get('historico', []))} -> "
-                              f"{len(after.get('historico', []))} notas); {status_txt}")
-        elif after == before:
-            res["feito"] = falha("progresso.json não mudou", status_txt)
-        else:
-            res["feito"] = falha("botão Desfazer não apareceu", status_txt)
-        if undo is None:
-            res["desfazer"] = falha("sem botão Desfazer")
-            return res
-        drv.execute_script("arguments[0].scrollIntoView({block:'center'})", undo)
-        try:
-            undo.click()
-        except WebDriverException as e:
-            res["clique_desfazer"] = f"clique nativo falhou ({first_line(e)}); clique por script"
-            drv.execute_script("arguments[0].click()", undo)
-        wait(lambda: not drv.find_elements(By.CSS_SELECTOR, "[data-undo]"), 15)
-        status_txt = drv.execute_script("return (document.getElementById('acao-status')||{}).textContent || ''")
-        back = load()
-        res["status_desfazer"] = status_txt
-        screen_capture(ctx.out / f"{ctx.so}-{ctx.nav}-PAINEL_REAL_HTTP-tela.png")
-        ctx.shot(drv, "PAINEL_REAL_HTTP-desfazer")
-        res["desfazer"] = ok(status_txt) if back == before else falha("progresso.json não voltou", status_txt)
-        res["console"] = console_logs(drv, ctx.nav)
-        return res
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        log.close()
+    def finish(self, cenario):
+        pg = self.pg
+        if not pg:
+            return
+        self.last_shot = f"{self.so}-{self.nav}-{cenario}.png"
+        pg.shot(self.out / self.last_shot)
+        self.last_console = pg.console(self.nav)
+        if pg.drv:
+            quit_driver(pg.drv)
+        elif isinstance(pg, SafariApple):
+            quit_safari()
+        self.pg = None
 
 
-# ---------------------------------------------------------------- measures
-def step(sc, key, posts=False):
-    """Cell for one step of a page scenario."""
-    if sc is None:
-        return ambiente("cenário não rodou")
-    if sc["status"] == "ambiente":
-        return ambiente(sc["motivo"], sc["detalhe"])
-    lab = sc.get("lab") or {}
-    if not lab.get("fim"):
-        return falha("página não terminou em 30 s", json.dumps(lab, ensure_ascii=False)[:500])
-    e = lab.get(key)
-    if e is None:
-        return falha(f"etapa {key} não rodou")
-    if not e.get("ok"):
-        return falha(e.get("detalhe") or "falhou", e.get("detalhe"))
-    if posts:
-        got = [x for x in sc.get("servidor", []) if x["metodo"] == "POST" and x["caminho"].startswith("/feito")]
-        if not any(x["status"] == 200 for x in got):
-            return falha("servidor não registrou o POST", json.dumps(got, ensure_ascii=False)[:500])
-        pre = [x for x in sc.get("servidor", []) if x["metodo"] == "OPTIONS"]
-        return ok(f"{e.get('detalhe')}; POST 200 no servidor; preflight: {len(pre)}"
-                  + (f" (Private-Network: {pre[0]['ac_request_private_network']})" if pre else ""))
-    return ok(e.get("detalhe"))
-
-
-def measures(sc):
-    m = {}
-    m["arquivo_grava"] = step(sc.get("ARQUIVO"), "gravar", posts=True)
-    g = step(sc.get("ARQUIVO"), "guardar")
-    r = step(sc.get("ARQUIVO_RECARREGAR"), "inicial")
-    if g["status"] != "ok":
-        m["arquivo_guarda"] = g
-    elif r["status"] == "falha":
-        m["arquivo_guarda"] = falha(f"não persistiu ao recarregar: {r['detalhe']}")
-    else:
-        m["arquivo_guarda"] = r if r["status"] != "ok" else ok("guardou e persistiu ao recarregar")
-    m["arquivo_reabrir"] = step(sc.get("ARQUIVO_REABRIR"), "inicial")
-    m["arquivo_outro"] = step(sc.get("ARQUIVO_OUTRA_PASTA"), "leitura")
-    m["http_grava"] = step(sc.get("HTTP"), "gravar", posts=True)
-    m["http_reabrir"] = step(sc.get("HTTP_REABRIR"), "inicial")
-    p = sc.get("PAINEL_REAL_HTTP")
-    m["painel_feito"] = (p or {}).get("feito") or ambiente("cenário não rodou")
-    m["painel_desfazer"] = (p or {}).get("desfazer") or ambiente("cenário não rodou")
-    return m
-
-
-def all_env(res, motivo, detalhe=""):
-    res["medidas"] = {k: ambiente(motivo, detalhe) for k in MEDIDAS}
+def run_scenario(fn, ctx):
+    t0 = time.time()
+    ctx.last_shot, ctx.last_console = None, None
+    try:
+        steps = fn(ctx)
+        res = {"status": "ok", "motivo": "", "passos": steps}
+    except Falha as e:
+        res = {"status": "falha", "motivo": str(e)}
+    except Ambiente as e:
+        res = {"status": "ambiente", "motivo": str(e)}
+    except JavascriptException as e:  # the page did not have what the step expected
+        res = {"status": "falha", "motivo": f"erro na página: {first_line(e)}"}
+    except WebDriverException as e:
+        res = {"status": "ambiente", "motivo": f"WebDriver: {first_line(e)}"}
+    except (OSError, subprocess.SubprocessError) as e:  # osascript / runner
+        res = {"status": "ambiente", "motivo": f"{type(e).__name__}: {first_line(e)}"}
+    res.update({"segundos": round(time.time() - t0, 1), "screenshot": ctx.last_shot, "console": ctx.last_console})
     return res
 
 
-def run_browser(nav, so, out, server, tmp_root):
-    res = {"so": so, "navegador": nav, "versao": None, "cenarios": {}, "medidas": {}}
-    binary = find_binary(nav)
-    res["binario"] = binary
-    if not binary:
-        return all_env(res, "não instalado")
-    if nav == "safari":
-        return run_safari(res, so, out, server)
-    brave_driver = None
-    if nav == "brave":
-        raw, major = brave_version(binary)
-        res["versao_brave_disco"] = raw
-        if major is None:
-            return all_env(res, f"versão do Chromium do Brave não lida: {raw!r}")
-        try:
-            brave_driver, drv_ver = chromedriver_for(major, Path(tmp_root) / "brave-driver")
-        except Exception as e:  # noqa: BLE001 - network / CfT problem = environment
-            return all_env(res, f"chromedriver p/ Chromium {major}", f"Brave {raw}; {first_line(e)}")
-        res["chromedriver"] = drv_ver
-        if drv_ver.split(".")[0] != str(major):
-            return all_env(res, f"Brave Chromium {major} x chromedriver {drv_ver}")
-
-    profile = Path(tempfile.mkdtemp(prefix=f"lab-{nav}-", dir=tmp_root))
-    ctx = Ctx(so, nav, out, server)
-    sc = res["cenarios"]
-    file_index = (PROBE / "index.html").as_uri()
-    file_leitor = (PROBE / "outra-pasta" / "leitor.html").as_uri()
-    http_index = f"http://127.0.0.1:{PORT}/probe/index.html"
-
-    # session 1
+def run_browser(nav, so, out, tmp):
+    res = {"so": so, "navegador": nav, "versao": None, "cenarios": {}}
     try:
-        drv = start_driver(nav, profile, binary, brave_driver)
-    except Exception as e:  # noqa: BLE001 - driver / browser did not start = environment
-        return all_env(res, "driver não iniciou", first_line(e))
-    caps = drv.capabilities
-    res["versao"] = caps.get("browserVersion") or caps.get("version")
-    res["driver"] = (caps.get("chrome") or caps.get("msedge") or {}).get("chromedriverVersion") \
-        or (caps.get("msedge") or {}).get("msedgedriverVersion") or caps.get("moz:geckodriverVersion")
-    if nav == "brave":
-        res["versao"] = f"{res['versao_brave_disco']} (Chromium {res['versao']})"
-    try:
-        sc["ARQUIVO"] = page_scenario(ctx, drv, "ARQUIVO", file_index)
-        sc["ARQUIVO_RECARREGAR"] = page_scenario(ctx, drv, "ARQUIVO_RECARREGAR", reload=True)
-        sc["ARQUIVO_OUTRA_PASTA"] = page_scenario(ctx, drv, "ARQUIVO_OUTRA_PASTA", file_leitor)
-        sc["HTTP"] = page_scenario(ctx, drv, "HTTP", http_index)
-    finally:
-        quit_driver(drv)
-    time.sleep(3)  # let the browser flush its storage to the profile
-
-    # session 2: same profile (Safari: a new session; it has no profile choice)
-    try:
-        drv = start_driver(nav, profile, binary, brave_driver)
-    except Exception as e:  # noqa: BLE001
-        for c in ("ARQUIVO_REABRIR", "HTTP_REABRIR"):
-            sc[c] = {"cenario": c, **ambiente("driver não reabriu", first_line(e))}
-        sc["PAINEL_REAL_HTTP"] = {"feito": ambiente("driver não reabriu", first_line(e)),
-                                  "desfazer": ambiente("driver não reabriu", first_line(e))}
-        res["medidas"] = measures(sc)
+        browser = Navegador(nav, tmp)
+    except Ambiente as e:
+        res["cenarios"] = {c: {"status": "ambiente", "motivo": str(e)} for c in SCENARIOS}
         return res
-    try:
-        sc["ARQUIVO_REABRIR"] = page_scenario(ctx, drv, "ARQUIVO_REABRIR", file_index)
-        sc["HTTP_REABRIR"] = page_scenario(ctx, drv, "HTTP_REABRIR", http_index)
-        sc["PAINEL_REAL_HTTP"] = painel_real(ctx, drv)
-    finally:
-        quit_driver(drv)
-    res["medidas"] = measures(sc)
+    ctx = Ctx(so, nav, out, tmp, browser)
+    for name, fn in zip(SCENARIOS, (cenario_a, cenario_b, cenario_c, cenario_d)):
+        r = run_scenario(fn, ctx)
+        if r["status"] == "ambiente":  # one more try; if it persists, it is a warning
+            first = r["motivo"]
+            r = run_scenario(fn, ctx)
+            r["tentativas"] = 2
+            if r["status"] == "ambiente":
+                r["aviso"] = True
+                r["primeira_tentativa"] = first
+        res["cenarios"][name] = r
+        print(f"   {name}: {r['status']} {r.get('motivo', '')[:160]}", flush=True)
+    res["versao"] = browser.versao
     return res
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Laboratório de navegadores (só no GitHub Actions).")
+    ap = argparse.ArgumentParser(description="Laboratório de navegadores do painel (só no GitHub Actions).")
     ap.add_argument("--so", required=True)
     ap.add_argument("--browsers", required=True)
     ap.add_argument("--out", default="results")
     args = ap.parse_args(argv)
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-
-    token = secrets.token_urlsafe(16)
-    (PROBE / "config.js").write_text(
-        "window.LAB = " + json.dumps({"url": f"http://127.0.0.1:{PORT}", "token": token}) + ";\n", encoding="utf-8")
-    server = probe_server.make_server(PORT, out / "server-log.json")
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-
+    tmp = tempfile.mkdtemp(prefix="browser-lab-")
     results = {"so": args.so, "plataforma": platform.platform(), "maquina": platform.machine(),
-               "python": sys.version.split()[0], "selenium": selenium.__version__,
-               "brave_instalacao": os.environ.get("BRAVE_INSTALL", ""), "navegadores": []}
-    broke = False
-    tmp_root = tempfile.mkdtemp(prefix="browser-lab-")
-    try:
-        for nav in [b.strip() for b in args.browsers.split(",") if b.strip()]:
-            print(f"== {args.so} / {nav}", flush=True)
-            try:
-                r = run_browser(nav, args.so, out, server, tmp_root)
-            except Exception:  # noqa: BLE001 - a bug in the lab itself
-                broke = True
-                r = {"so": args.so, "navegador": nav, "erro_do_laboratorio": traceback.format_exc()}
-                print(r["erro_do_laboratorio"], flush=True)
-            results["navegadores"].append(r)
-            for k, v in (r.get("medidas") or {}).items():
-                print(f"   {k}: {v['status']} {v['motivo']}", flush=True)
-            (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
-    finally:
-        server.shutdown()
-        server.server_close()
-        (PROBE / "config.js").unlink(missing_ok=True)
-    return 1 if broke else 0
+               "python": sys.version.split()[0], "selenium": selenium.__version__, "navegadores": []}
+    failed = False
+    for nav in [b.strip() for b in args.browsers.split(",") if b.strip()]:
+        print(f"== {args.so} / {nav}", flush=True)
+        try:
+            r = run_browser(nav, args.so, out, tmp)
+        except Exception:  # noqa: BLE001 - a bug in the lab itself
+            r = {"so": args.so, "navegador": nav, "erro_do_laboratorio": traceback.format_exc()}
+            print(r["erro_do_laboratorio"], flush=True)
+        results["navegadores"].append(r)
+        if r.get("erro_do_laboratorio") or any(c["status"] == "falha" for c in r.get("cenarios", {}).values()):
+            failed = True
+        (out / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

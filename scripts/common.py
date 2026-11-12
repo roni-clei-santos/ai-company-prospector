@@ -1,7 +1,10 @@
 """Shared helpers for the prospecting scripts.
 
-All scripts work on the PROJECT folder: $PROSPECT_DIR if set, otherwise the current directory.
-Run them from the project folder (where perfil.local.md and controle/ live).
+All scripts work on the PROJECT folder: $PROSPECT_DIR, else the current folder when it is a project,
+else the path saved in ~/.config/ai-company-prospector/projeto (Windows:
+%APPDATA%\\ai-company-prospector\\projeto), so /painel works from any folder (see project_root()).
+
+Usage: python3 scripts/common.py --gravar-projeto <folder>   save <folder> as the project (installers)
 """
 import json
 import os
@@ -88,8 +91,110 @@ def normalize_url_text(text):
                   lambda m: normalize_url(m.group(0)), text)
 
 
+PANEL_PORTS = range(47321, 47331)   # fixed address of the panel server: 47321, then 47322..47330 if taken
+TOKEN_FILE = Path("controle") / ".painel-token"
+SERVER_JS = Path("painel") / "servidor.js"
+NO_PROJECT = "Não achei o projeto. Rode o instalador na pasta do projeto."
+
+
+def project_pointer_file():
+    """File with the absolute path of the project, written by the installers and by gerar_painel.py.
+
+    ~/.config/ai-company-prospector/projeto (Windows: %APPDATA%\\ai-company-prospector\\projeto).
+    """
+    override = os.environ.get("AI_PROSPECTOR_PROJETO_ARQUIVO")  # tests point it to a temporary file
+    if override:
+        return Path(override)
+    if os.name == "nt":
+        base = Path(os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming"))
+    else:
+        base = Path.home() / ".config"
+    return base / "ai-company-prospector" / "projeto"
+
+
+def save_project_pointer(root):
+    """Remember `root` as the project folder (so /painel works from any folder)."""
+    path = project_pointer_file()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(Path(root).resolve()) + "\n", encoding="utf-8")
+    except OSError:
+        return None
+    return path
+
+
+def _project_candidates():
+    env = os.environ.get("PROSPECT_DIR")
+    if env:
+        yield Path(env)
+    yield Path.cwd()  # a project folder you are in always wins over the saved one (never the wrong project)
+    try:
+        saved = project_pointer_file().read_text(encoding="utf-8").strip()
+        if saved:
+            yield Path(saved)
+    except OSError:
+        pass
+
+
+def find_project():
+    """The first of $PROSPECT_DIR, the current folder and the saved project path
+    (~/.config/ai-company-prospector/projeto) that has controle/progresso.json, or None.
+    From any other folder, /painel finds the project through the saved path."""
+    for cand in _project_candidates():
+        try:
+            if (cand / "controle" / "progresso.json").is_file():
+                return cand.resolve()
+        except OSError:
+            continue
+    return None
+
+
+def _looks_like_project(folder):
+    return any((folder / f).exists() for f in ("controle/progresso.json", "perfil.local.md", "scripts/gerar_painel.py"))
+
+
 def project_root():
-    return Path(os.environ.get("PROSPECT_DIR") or Path.cwd()).resolve()
+    """Project folder of every script. An explicit $PROSPECT_DIR (even a project being created) or a current
+    folder that is a project (or this repository) always wins, so a script never writes into another
+    project; otherwise find_project() (the saved project); otherwise the current folder."""
+    env = os.environ.get("PROSPECT_DIR")
+    if env:
+        return Path(env).resolve()
+    if _looks_like_project(Path.cwd()):
+        return Path.cwd().resolve()
+    return find_project() or Path.cwd().resolve()
+
+
+def painel_token(root):
+    """Persistent token of the panel server: controle/.painel-token (32 random bytes in hex), created once."""
+    import secrets
+    path = Path(root) / TOKEN_FILE
+    try:
+        token = path.read_text(encoding="utf-8").strip()
+        if re.fullmatch(r"[0-9a-f]{64}", token):
+            return token
+    except OSError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    token = secrets.token_hex(32)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(token + "\n")
+    return token
+
+
+def server_js(port, token):
+    return "window.PAINEL_SERVIDOR = " + json.dumps({"url": f"http://127.0.0.1:{port}", "token": token}) + ";\n"
+
+
+def write_server_js(root, port, token):
+    """painel/servidor.js: address and token of the local server, loaded by the panel with <script src>."""
+    path = Path(root) / SERVER_JS
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".js.tmp")
+    tmp.write_text(server_js(port, token), encoding="utf-8")
+    os.replace(tmp, path)
+    return path
 
 
 def split_status(raw):
@@ -185,3 +290,13 @@ def save_workbook_atomic(wb, path):
     os.close(fd)
     wb.save(tmp)
     os.replace(tmp, path)
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) == 3 and sys.argv[1] == "--gravar-projeto":
+        saved = save_project_pointer(sys.argv[2])
+        print(f"Projeto gravado em {saved}" if saved else "Não consegui gravar o caminho do projeto.")
+        sys.exit(0 if saved else 1)
+    print(__doc__)
+    sys.exit(2)

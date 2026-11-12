@@ -84,13 +84,18 @@ def snapshot(root):
     return texts
 
 
-def test_serves_panel_with_session_token(server):
+def test_serves_panel_with_persistent_token(server):
     code, js = call(server, "/data.js")
-    assert code == 200 and js.startswith("window.PAINEL_DATA = ")
-    assert f'window.PAINEL_SERVIDOR = {{"token": "{server.token}"}}' in js
+    assert code == 200 and js.startswith("window.PAINEL_DATA = ") and server.token not in js
+    code, js = call(server, "/servidor.js")
+    assert code == 200 and js == f'window.PAINEL_SERVIDOR = {{"url": "{server.base}", "token": "{server.token}"}};\n'
+    assert (server.root / "controle" / ".painel-token").read_text(encoding="utf-8").strip() == server.token
+    assert re.fullmatch(r"[0-9a-f]{64}", server.token)
     code, html = call(server, "/index.html")
     assert code == 200 and "Pendentes" in html
-    assert Path(json.loads(call(server, "/api/estado")[1])["raiz"]).resolve() == server.root.resolve()
+    assert call(server, "/api/estado")[0] == 403  # /api/* needs the token
+    code, body = call(server, "/api/estado", headers={"X-Painel-Token": server.token})
+    assert code == 200 and Path(json.loads(body)["raiz"]).resolve() == server.root.resolve()
 
 
 def test_only_this_computer_and_this_page(server):
@@ -99,8 +104,9 @@ def test_only_this_computer_and_this_page(server):
     assert call(server, "/index.html", headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate"})[0] == 200
     assert call(server, "/index.html", headers={"Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "no-cors"})[0] == 403
     assert call(server, "/data.json", headers={"Host": "evil.example.com"})[0] == 403
+    assert call(server, "/servidor.js", headers={"Sec-Fetch-Site": "cross-site"})[0] == 403  # the token never leaks
     assert call(server, "/api/feito", {"id": GERENTE}, token=False)[0] == 403
-    assert call(server, "/api/feito", {"id": GERENTE}, origin=False)[0] == 403
+    assert call(server, "/api/feito", {"id": GERENTE}, headers={"X-Painel-Token": "0" * 64})[0] == 403
     assert call(server, "/api/feito", {"id": GERENTE}, headers={"Origin": "https://example.com"})[0] == 403
     assert server.server_address[0] == "127.0.0.1"
     assert not (server.root / "controle" / "painel-feitos.json").exists()  # nothing was recorded
@@ -160,11 +166,79 @@ def test_feito_email_followup_and_decision(server):
     assert snapshot(root) == before
 
 
-def test_feito_twice_and_unknown(server):
-    assert call(server, "/api/feito", {"id": GERENTE})[0] == 200
-    assert call(server, "/api/feito", {"id": GERENTE})[0] == 404  # no longer pending
-    assert call(server, "/api/feito", {"id": "li:nao-existe"})[0] == 404
-    assert call(server, "/api/desfazer", {"id": "li:nao-existe"})[0] == 409
+def test_feito_and_desfazer_are_idempotent(server):
+    """A queued click may arrive twice, or for an item that is gone: 200, nothing written twice."""
+    assert json.loads(call(server, "/api/feito", {"id": GERENTE})[1])["feito"] == GERENTE
+    after_one = snapshot(server.root)
+    code, body = call(server, "/api/feito", {"id": GERENTE})
+    assert code == 200 and json.loads(body)["sem_mudanca"] is True
+    assert snapshot(server.root) == after_one
+    code, body = call(server, "/api/feito", {"id": "li:nao-existe"})
+    assert code == 200 and json.loads(body)["ignorado"] == "item não está mais pendente"
+    assert call(server, "/api/desfazer", {"id": GERENTE})[0] == 200
+    before = snapshot(server.root)
+    code, body = call(server, "/api/desfazer", {"id": GERENTE})
+    assert code == 200 and json.loads(body)["sem_mudanca"] is True
+    code, body = call(server, "/api/desfazer", {"id": "li:nao-existe"})
+    assert code == 200 and json.loads(body)["sem_mudanca"] is True
+    assert snapshot(server.root) == before
+    assert registrar.done_ids(server.root) == set()
+
+
+def _raw(srv, method, path, headers=None, body=None):
+    """Request with the path sent exactly as given (urllib would normalize "../")."""
+    import http.client
+    conn = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=10)
+    h = {"Host": f"127.0.0.1:{srv.server_address[1]}"}
+    h.update(headers or {})
+    conn.request(method, path, body=json.dumps(body) if body is not None else None, headers=h)
+    r = conn.getresponse()
+    out = (r.status, dict((k.lower(), v) for k, v in r.getheaders()), r.read().decode("utf-8", "replace"))
+    conn.close()
+    return out
+
+
+def test_cors_for_the_page_opened_from_disk(server):
+    """file:// pages send Origin "null": allowed with the token, never without it; other sites never."""
+    code, h, _ = _raw(server, "OPTIONS", "/api/feito", {"Origin": "null", "Access-Control-Request-Method": "POST",
+                                                        "Access-Control-Request-Headers": "content-type,x-painel-token"})
+    assert code == 204
+    assert h["access-control-allow-origin"] == "null"
+    assert h["access-control-allow-methods"] == "GET, POST, OPTIONS"
+    assert h["access-control-allow-headers"] == "Content-Type, X-Painel-Token"
+    assert h["access-control-allow-private-network"] == "true" and h["access-control-max-age"] == "0"
+    json_h = {"Origin": "null", "Content-Type": "application/json", "Sec-Fetch-Site": "cross-site"}
+    code, h, body = _raw(server, "POST", "/api/feito", dict(json_h, **{"X-Painel-Token": server.token}), {"id": GERENTE})
+    assert code == 200 and h["access-control-allow-origin"] == "null" and json.loads(body)["feito"] == GERENTE
+    code, h, _ = _raw(server, "GET", "/data.json", {"Origin": "null", "Sec-Fetch-Site": "cross-site", "X-Painel-Token": server.token})
+    assert code == 200 and h["access-control-allow-origin"] == "null"
+    # wrong or missing token: refused, nothing written
+    for headers in ({"X-Painel-Token": "f" * 64}, {}):
+        code, h, _ = _raw(server, "POST", "/api/desfazer", dict(json_h, **headers), {"id": GERENTE})
+        assert code == 403
+        assert _raw(server, "GET", "/data.json", dict({"Origin": "null", "Sec-Fetch-Site": "cross-site"}, **headers))[0] == 403
+    assert registrar.done_ids(server.root) == {GERENTE}
+    # any other site: refused even with the token, and no CORS header for it
+    for origin in ("https://example.com", "http://127.0.0.1:1"):
+        code, h, _ = _raw(server, "OPTIONS", "/api/feito", {"Origin": origin, "Access-Control-Request-Method": "POST"})
+        assert code == 403 and "access-control-allow-origin" not in h
+        code, h, _ = _raw(server, "POST", "/api/desfazer", dict(json_h, Origin=origin, **{"X-Painel-Token": server.token}), {"id": GERENTE})
+        assert code == 403 and "access-control-allow-origin" not in h
+    assert registrar.done_ids(server.root) == {GERENTE}
+
+
+def test_reports_only_from_painel_relatorios(server):
+    reports = server.root / "painel" / "relatorios"
+    reports.mkdir(parents=True, exist_ok=True)
+    (reports / "001-loja-exemplo-1.html").write_text("<p>relatório</p>", encoding="utf-8")
+    (server.root / "painel" / "segredo.html").write_text("segredo", encoding="utf-8")
+    assert _raw(server, "GET", "/relatorios/001-loja-exemplo-1.html")[0] == 200
+    for path in ("/relatorios/../segredo.html", "/relatorios/..%2fsegredo.html", "/relatorios/%2e%2e/segredo.html",
+                 "/relatorios/../../controle/progresso.json", "/relatorios/..\\segredo.html", "/relatorios/Maiuscula.html",
+                 "/relatorios/.oculto.html", "/relatorios/001-loja-exemplo-1.md", "/relatorios/nao-existe.html",
+                 "/relatorios//etc/passwd", "/relatorios/sub/001-loja-exemplo-1.html"):
+        code, _, body = _raw(server, "GET", path)
+        assert code == 404 and "segredo" not in body and "empresas" not in body, path
 
 
 def test_marked_item_never_comes_back(server):
@@ -176,15 +250,22 @@ def test_marked_item_never_comes_back(server):
     assert gerar_painel.build(server.root, today="2026-11-13")["pendentes"]["enviados_hoje"] == []  # only today's
 
 
-def test_opens_through_server(tmp_path, monkeypatch):
+def test_opens_the_file_with_the_server_on(tmp_path, monkeypatch):
+    """/painel opens painel/index.html (the same page as a double click) after starting the server."""
     make_project(tmp_path, monkeypatch)
-    opened = []
-    monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda uri: opened.append(uri) or True)
-    monkeypatch.setattr(gerar_painel, "ensure_server", lambda root: "http://127.0.0.1:5555/index.html")
+    in_browser, fallback, started = [], [], []
+    monkeypatch.setattr(gerar_painel, "open_file_in_browser", lambda uri: in_browser.append(uri) or True)
+    monkeypatch.setattr(gerar_painel.webbrowser, "open", lambda uri: fallback.append(uri) or True)
+    monkeypatch.setattr(gerar_painel, "ensure_server", lambda root: started.append(root) or "http://127.0.0.1:47321/index.html")
     gerar_painel.main([])
     gerar_painel.main(["--arquivo"])
-    assert opened[0] == "http://127.0.0.1:5555/index.html"
-    assert opened[1].startswith("file://") and opened[1].endswith("/painel/index.html")
+    assert len(started) == 1 and fallback == []
+    assert all(u.startswith("file://") and u.endswith("/painel/index.html") for u in in_browser) and len(in_browser) == 2
+    assert (tmp_path / "painel" / "servidor.js").read_text(encoding="utf-8").startswith('window.PAINEL_SERVIDOR = {"url": "http://127.0.0.1:47321"')
+    # no browser for file:// pages (unknown default browser): the server address is opened instead
+    monkeypatch.setattr(gerar_painel, "open_file_in_browser", lambda uri: False)
+    gerar_painel.main([])
+    assert fallback == ["http://127.0.0.1:47321/index.html"]
 
 
 def test_ensure_server_starts_and_reuses(tmp_path, monkeypatch):
@@ -192,10 +273,14 @@ def test_ensure_server_starts_and_reuses(tmp_path, monkeypatch):
     url = gerar_painel.ensure_server(tmp_path)
     try:
         log = tmp_path / "controle" / ".painel-servidor.log"
-        assert url and re.match(r"^http://127\.0\.0\.1:\d+/index\.html$", url), log.read_text(errors="replace") if log.exists() else "sem log"
+        assert url and re.match(r"^http://127\.0\.0\.1:473(2\d|30)/index\.html$", url), log.read_text(errors="replace") if log.exists() else "sem log"
         assert gerar_painel.ensure_server(tmp_path) == url  # reused, not a second server
-        with urllib.request.urlopen(url.replace("index.html", "api/estado"), timeout=5) as r:
+        token = (tmp_path / "controle" / ".painel-token").read_text(encoding="utf-8").strip()
+        req = urllib.request.Request(url.replace("index.html", "api/estado"), headers={"X-Painel-Token": token})
+        with urllib.request.urlopen(req, timeout=5) as r:
             assert Path(json.loads(r.read().decode("utf-8"))["raiz"]).resolve() == tmp_path.resolve()
+        port = url.split(":")[2].split("/")[0]
+        assert f'"url": "http://127.0.0.1:{port}", "token": "{token}"' in (tmp_path / "painel" / "servidor.js").read_text(encoding="utf-8")
     finally:
         _stop_detached(tmp_path)
 
@@ -235,18 +320,17 @@ def _dump(url):
 
 def test_render_through_server(server):
     html = _dump(server.base + "/index.html")
-    assert "Marcou como Feito, está registrado." in html
-    assert "Enviados hoje" in html and "disabled" not in re.search(r'<section id="pendentes".*?</section>', html, re.S).group(0)
-    assert "fica salvo só neste navegador" not in html
+    sec = re.search(r'<section id="pendentes".*?</section>', html, re.S).group(0)
+    assert "Enviados hoje" in sec and " disabled" not in sec and sec.count('data-done="') == 13
 
 
-def test_render_from_file_disables_feito(tmp_path, monkeypatch):
+def test_render_from_file_feito_enabled(tmp_path, monkeypatch):
+    """Opened straight from disk, even with no server: every "Feito" works (the click is queued)."""
     make_project(tmp_path, monkeypatch)
     html = _dump((tmp_path / "painel" / "index.html").as_uri())
     sec = re.search(r'<section id="pendentes".*?</section>', html, re.S).group(0)
-    assert sec.count('data-done="') == sec.count(" disabled") == 13
-    assert sec.count('title="Abra pelo /painel para registrar"') == 13
-    assert "Abra pelo /painel para registrar" in sec and "Enviados hoje" not in sec
+    assert sec.count('data-done="') == 13 and " disabled" not in sec
+    assert "Abra pelo /painel" not in sec and "Enviados hoje" in sec
 
 
 def test_render_demo_only_strikes(tmp_path):

@@ -348,9 +348,11 @@ def test_rendered_empty_sections(tmp_path, monkeypatch):
     assert "0 mensagens de LinkedIn, 0 e-mails, 0 follow-ups vencidos e 0 decisões suas" in re.sub(r"<[^>]+>", "", sec)
 
 
-def test_painel_skill_runs_only_step_2():
+def test_painel_skill_only_opens_the_panel():
+    """/painel runs scripts/gerar_painel.py and nothing else: no LinkedIn, Gmail or Chrome."""
     skill = (REPO / "skills" / "painel" / "SKILL.md").read_text(encoding="utf-8")
     assert skill.startswith("---\nname: painel\n")
-    assert "Passo 2" in skill and "skills/next-companies/SKILL.md" in skill
-    assert "gerar_painel.py" in skill
-    assert re.search(r"N[ÃA]O processe nenhuma empresa", skill)
+    assert "scripts/gerar_painel.py" in skill
+    assert re.search(r"PROIBIDO nesta skill: abrir ou usar o LinkedIn, o Gmail, o Chrome", skill)
+    assert "preflight-linkedin" not in skill and "tabs_context_mcp" not in skill
+    assert "Não achei o projeto. Rode o instalador na pasta do projeto." in skill

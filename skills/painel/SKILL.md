@@ -1,54 +1,32 @@
 ---
 name: painel
-description: Atualiza a lista de pendentes da prospecção sem gastar uma rodada: confere sozinha o que o candidato enviou no LinkedIn e no Gmail (só leitura, o Passo 2 do /next-companies), registra, regenera o painel e abre na aba Pendentes. Não processa nenhuma empresa. Use quando o usuário digitar /painel.
+description: Abre o painel da prospecção (aba Pendentes) de qualquer pasta: regenera os dados, liga o servidor local se estiver parado e abre no navegador. Não acessa LinkedIn, Gmail nem Chrome e não processa nenhuma empresa. Use quando o usuário digitar /painel.
 ---
 
-# /painel — atualizar os pendentes e abrir o painel
+# /painel: abrir o painel
 
-O usuário (o CANDIDATO) digita só `/painel`. Esta skill faz três coisas e para:
-1. descobre o que ele enviou no LinkedIn e no Gmail desde a DATA DE CORTE e registra (o mesmo Passo 2 do `/next-companies`);
-2. regenera o painel;
-3. abre o painel pelo servidor local (http://127.0.0.1, só neste computador), que começa na aba **Pendentes**. Aberto assim, cada clique em "Feito" registra o item como ENVIADO hoje em todos os lugares, com "Desfazer" em "Enviados hoje".
+O usuário (o CANDIDATO) digita só `/painel`. Esta skill roda UM comando e para.
 
-O clique do CANDIDATO em "Feito" é a fonte da verdade: a conferência deste passo é só para os itens que ele NÃO marcou (envios que esqueceu de marcar) e para as respostas recebidas. Nunca desmarque nem registre de novo um item que está em `controle/painel-feitos.json` ou já tem ✅.
+PROIBIDO nesta skill: abrir ou usar o LinkedIn, o Gmail, o Chrome ou o Claude in Chrome; pesquisar empresas; criar rascunhos; candidatar-se; mudar status; editar `relatorio-parcial.md`. A conferência do que o CANDIDATO enviou fica só no `/next-companies` (Passo 2). O clique do CANDIDATO em "Feito", no painel, já registra o envio no projeto.
 
-NÃO processe nenhuma empresa nova: não pesquise empresas, não crie rascunho, não se candidate, não crie `relatorios/rodada-*.md` e não mude o status de empresa nenhuma.
+## Passo 1: achar o projeto
 
-Tudo sobre o CANDIDATO está em `perfil.local.md` (o PERFIL). Nunca escreva dado pessoal fora das pastas pessoais (`controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `relatorio-*`).
+O script do painel fica na pasta do projeto. Use, nesta ordem, a primeira opção que existir:
+1. `scripts/gerar_painel.py` na pasta atual;
+2. a pasta escrita no arquivo `~/.config/ai-company-prospector/projeto` (Windows: `%APPDATA%\ai-company-prospector\projeto`), que os instaladores e o próprio painel gravam;
+3. no Windows, a pasta escrita no arquivo `.installed-from` desta skill.
 
-## Passo 0 — Preflight (pare se falhar)
+Se nenhuma existir, PARE com: "Não achei o projeto. Rode o instalador na pasta do projeto."
 
-1. Leia e siga, nesta ordem, `skills/_shared/preflight-basico.md` e `skills/_shared/preflight-linkedin.md` (Chrome conectado e LinkedIn logado; o Gmail só é conferido se `modo_email` = "gmail_rascunho"). A regra de LinkedIn SÓ LEITURA vale em toda a skill.
-2. Se não existir `controle/progresso.json`, PARE com: "Não achei o controle/progresso.json. Rode /build-company-list primeiro."
-3. Se não existir `relatorio-parcial.md`, não há envio para conferir: pule para o Passo 3.
+## Passo 2: abrir o painel
 
-## Passo 1 — Carregar o estado
+Rode `python3 "<pasta do projeto>/scripts/gerar_painel.py"` (no Windows, `py -3` no lugar de `python3`). O script regenera `painel/data.json`, `painel/data.js` e os relatórios em `painel/relatorios/`. Também liga o servidor local, se estiver parado, e abre `painel/index.html` no navegador padrão, na aba Pendentes. O servidor fica em http://127.0.0.1:47321, só neste computador, e para sozinho 30 minutos depois do último uso.
 
-Leia `perfil.local.md`, `controle/progresso.json` (`empresas`, `historico`, `data_corte`, `nao_contatar`) e as seções 1, 2, 3 e 4 do `relatorio-parcial.md`. A DATA DE CORTE é `progresso.json > data_corte` (mesma regra do Passo 1.4 do `/next-companies`).
+Se o script responder "Não achei o projeto. Rode o instalador na pasta do projeto.", repasse a frase e pare.
 
-## Passo 2 — Conferir e registrar os envios (o Passo 2 do /next-companies)
+## Passo 3: responder
 
-Leia `skills/next-companies/SKILL.md` e execute SÓ o "Passo 2 — Descobrir sozinha o que o CANDIDATO enviou", inteiro e do jeito que está escrito lá: 2.1 E-mail, 2.2 LinkedIn (somente leitura) e 2.3 Registrar. Não execute nenhum outro passo daquela skill.
-
-Depois, como esta skill não tem o Passo 5 do `/next-companies`, atualize também o `relatorio-parcial.md`, sem mexer em mais nada dele:
-- seção 3: para cada e-mail confirmado, acrescente `✅ ENVIADO DD/MM` na coluna `#` da linha;
-- seção 4: para cada pessoa confirmada, troque a coluna `Prio` por `✅` e comece a coluna `Destinatário` com `**ENVIADO DD/MM/AAAA**`;
-- seção 1: atualize só os números de rascunhos enviados e pendentes (e-mail e LinkedIn);
-- seção 2: tire os itens que esses envios resolveram.
-
-Então atualize a DATA DE CORTE como no Passo 5.4 do `/next-companies`: a data de criação do rascunho pendente mais antigo (sem ✅ e sem NÃO ENVIAR) das seções 3 e 4; se não houver nenhum, a data de hoje. Grave com `python3 scripts/registrar.py --data-corte AAAA-MM-DD`.
-
-Se o LinkedIn ou o Gmail não abrir, não insista: anote "LinkedIn não conferido: <motivo>" (ou Gmail) e siga para o Passo 3 com o que tiver.
-
-## Passo 3 — Regenerar e abrir o painel
-
-1. Rode `python3 scripts/checar_nao_contatar.py`. Se ele apontar algum rascunho pendente para pessoa ou empresa `NAO_CONTATAR`, marque `NÃO ENVIAR` nesse rascunho e na linha dele no `relatorio-parcial.md`.
-2. Rode `python3 scripts/gerar_painel.py`. Ele grava `painel/data.json`, inicia (ou reaproveita) em segundo plano o servidor local `scripts/servidor_painel.py` (só biblioteca padrão do Python, em http://127.0.0.1 numa porta livre, acessível só por este computador) e abre o painel no navegador padrão (macOS, Linux e Windows), já na aba Pendentes. O servidor para sozinho depois de 12 horas sem uso.
-3. Leia `painel/data.json > pendentes > conferencia`: `linkedin_secao4` (pessoas sem ✅ e sem NÃO ENVIAR na seção 4) tem que ser igual a `linkedin_painel` + `ocultos_nao_contatar`. Se não for, diga isso no resumo.
-
-## Passo 4 — Responder
-
-Responda ao CANDIDATO só com, nesta ordem:
-- Envios que encontrei (e-mail e LinkedIn), "Responderam" e "Conferir", se houver. Se nada foi encontrado, diga "Nenhum envio novo desde DD/MM/AAAA."
-- A linha de totais da aba Pendentes: "X mensagens de LinkedIn, Y e-mails, Z follow-ups vencidos e W decisões suas."
-- "Painel atualizado e aberto: <URL http://127.0.0.1:... que o script mostrou> (aba Pendentes). Marcou como Feito, está registrado."
+Responda só com:
+- a linha de totais da aba Pendentes, lida em `painel/data.json > pendentes`: "X mensagens de LinkedIn, Y e-mails, Z follow-ups vencidos e W decisões suas." (follow-ups vencidos são os de `followups` com `data` até hoje);
+- "Painel aberto (aba Pendentes). Marcou como Feito, está registrado."
+- se o script avisou que não conseguiu ligar o servidor, repita o aviso dele.

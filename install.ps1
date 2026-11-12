@@ -85,7 +85,12 @@ if (Test-Rtk) {
 Invoke-Py (Join-Path $Repo 'scripts\atualizar_skills.py') --copy
 if ($LASTEXITCODE -ne 0) { Fail "Não consegui copiar as skills para $env:USERPROFILE\.claude\skills." }
 
-# 5) Personal profile ----------------------------------------------------------------
+# 5) Project folder: /painel and the scripts find it from any folder -------------------
+Invoke-Py (Join-Path $Repo 'scripts\common.py') --gravar-projeto $Repo *> $null
+if ($LASTEXITCODE -eq 0) { Ok "Pasta do projeto gravada em $env:APPDATA\ai-company-prospector\projeto" }
+else { Warn "Não consegui gravar o caminho do projeto em $env:APPDATA\ai-company-prospector\projeto." }
+
+# 6) Personal profile ----------------------------------------------------------------
 $Perfil = Join-Path $Repo 'perfil.local.md'
 if (Test-Path -LiteralPath $Perfil) {
     Ok "perfil.local.md já existe (não mexi)"

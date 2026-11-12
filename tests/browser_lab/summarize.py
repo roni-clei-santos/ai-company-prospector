@@ -12,10 +12,7 @@ ESPERADO = {"macos": ["safari", "chrome", "edge", "firefox", "brave"],
             "ubuntu": ["chrome", "firefox"]}
 NOMES = {"safari": "Safari", "chrome": "Chrome", "edge": "Edge", "firefox": "Firefox", "brave": "Brave"}
 SOS = {"macos": "macOS", "windows": "Windows", "ubuntu": "Ubuntu"}
-COLUNAS = [("arquivo_grava", "Arquivo: grava"), ("arquivo_guarda", "Arquivo: guarda clique"),
-           ("arquivo_reabrir", "Arquivo: persiste ao reabrir"), ("arquivo_outro", "Arquivo: outro arquivo lê"),
-           ("http_grava", "Http: grava"), ("http_reabrir", "Http: persiste ao reabrir"),
-           ("painel_feito", "Painel real: Feito"), ("painel_desfazer", "Painel real: Desfazer")]
+COLUNAS = [("A", "A arquivo+servidor"), ("B", "B arquivo sem servidor (fila)"), ("C", "C http"), ("D", "D auditoria")]
 
 
 def short(text, words=8):
@@ -23,52 +20,51 @@ def short(text, words=8):
     return " ".join(w[:words]) + (" …" if len(w) > words else "")
 
 
-def cell(m):
-    if not m:
+def cell(c):
+    if not c:
         return "AMBIENTE (sem medida)"
-    if m["status"] == "ok":
+    if c["status"] == "ok":
         return "✅"
-    if m["status"] == "ambiente":
-        return f"AMBIENTE ({short(m['motivo'], 12)})"
-    return f"❌ ({short(m['motivo'])})"
+    if c["status"] == "ambiente":
+        return f"AMBIENTE ({short(c.get('motivo'), 10)})"
+    return f"❌ ({short(c.get('motivo'))})"
 
 
-def load(folder):
+def main(folder, out):
     found = {}
     for path in sorted(Path(folder).rglob("results.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         for r in data.get("navegadores", []):
-            found[(data["so"], r["navegador"])] = (data, r)
-    return found
-
-
-def main(folder, out):
-    found = load(folder)
+            found[(data["so"], r["navegador"])] = r
     head = ["SO", "Navegador", "Versão"] + [c[1] for c in COLUNAS]
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
-    detalhes = []
+    detalhes, avisos, falhas = [], [], 0
     for so, navs in ESPERADO.items():
         for nav in navs:
-            data, r = found.get((so, nav), (None, None))
+            r = found.get((so, nav))
             if r is None:
-                cells = ["AMBIENTE (job sem resultados)"] * len(COLUNAS)
-                versao = "?"
+                cells, versao = ["AMBIENTE (job sem resultados)"] * len(COLUNAS), "?"
+                avisos.append(f"{SOS[so]} / {NOMES[nav]}: job sem resultados")
             elif r.get("erro_do_laboratorio"):
-                cells = ["AMBIENTE (erro do laboratório)"] * len(COLUNAS)
-                versao = "?"
+                cells, versao = ["❌ (erro do laboratório)"] * len(COLUNAS), "?"
+                falhas += 1
                 detalhes.append(f"- **{SOS[so]} / {NOMES[nav]}**: erro do laboratório\n```\n{r['erro_do_laboratorio'][-1500:]}\n```")
             else:
-                m = r.get("medidas", {})
-                cells = [cell(m.get(k)) for k, _ in COLUNAS]
-                versao = short(r.get("versao") or "?", 6)
+                cs = r.get("cenarios", {})
+                cells, versao = [cell(cs.get(k)) for k, _ in COLUNAS], short(r.get("versao") or "?", 6)
                 for k, label in COLUNAS:
-                    x = m.get(k) or {}
-                    if x.get("status") != "ok" or x.get("detalhe"):
-                        detalhes.append(f"- {SOS[so]} / {NOMES[nav]} / {label}: {x.get('status')} | "
-                                        f"{str(x.get('detalhe') or x.get('motivo') or '')[:400]}")
+                    c = cs.get(k) or {}
+                    if c.get("status") == "falha":
+                        falhas += 1
+                    if c.get("status") == "ambiente":
+                        avisos.append(f"{SOS[so]} / {NOMES[nav]} / {label}: {c.get('motivo')}")
+                    detalhes.append(f"- {SOS[so]} / {NOMES[nav]} / {label}: {c.get('status')} | "
+                                    + (str(c.get("motivo"))[:400] if c.get("status") != "ok" else "; ".join(c.get("passos", []))[:400]))
             lines.append("| " + " | ".join([SOS[so], NOMES[nav], versao] + cells) + " |")
-    text = "## Laboratório de navegadores\n\n" + "\n".join(lines) + "\n\n<details><summary>Detalhes</summary>\n\n" \
-        + "\n".join(detalhes) + "\n\n</details>\n"
+    text = "## Laboratório de navegadores: painel real\n\n" + "\n".join(lines) + "\n"
+    if avisos:
+        text += "\n**Avisos (AMBIENTE depois de 2 tentativas, não reprovam):**\n" + "\n".join(f"- {a}" for a in avisos) + "\n"
+    text += f"\n{falhas} cenário(s) com ❌.\n\n<details><summary>Detalhes</summary>\n\n" + "\n".join(detalhes) + "\n\n</details>\n"
     Path(out).write_text(text, encoding="utf-8")
     print(text)
 

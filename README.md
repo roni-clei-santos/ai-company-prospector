@@ -61,7 +61,7 @@
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icons/rascunhos.svg" width="40" alt=""><br><b>Rascunhos que você revisa</b><br>Mensagens de LinkedIn e e-mails no seu tom de voz, salvos como rascunho para você ler e enviar.</td>
-    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Painel com tudo o que falta</b><br>A aba <b>Pendentes</b> junta, de todas as rodadas, as mensagens de LinkedIn (texto pronto e botão de copiar), os e-mails, os follow-ups vencidos e as suas decisões. O <code>/painel</code> atualiza a lista sem gastar uma rodada.</td>
+    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>Painel com tudo o que falta</b><br>A aba <b>Pendentes</b> junta, de todas as rodadas, as mensagens de LinkedIn (texto pronto e botão de copiar), os e-mails, os follow-ups vencidos e as suas decisões. O <code>/painel</code> abre o painel de qualquer pasta, sem gastar uma rodada.</td>
     <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Economia de tokens com RTK</b><br>O instalador liga o <a href="https://github.com/rtk-ai/rtk">RTK</a>, que enxuga a saída dos comandos antes de ela chegar ao Claude.</td>
   </tr>
   <tr>
@@ -150,7 +150,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 O `install.ps1` confere o Python (`py -3` ou `python`), instala o RTK com o `winget` e **copia** as skills para `%USERPROFILE%\.claude\skills`. Depois de cada `git pull`, rode `py -3 scripts\atualizar_skills.py` para copiar a versão nova.
 </details>
 
-Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na pasta (`claude`) e rode **`/build-company-list`** para receber a planilha (não precisa de LinkedIn). Para o modo "Planilha + robô": rode `/chrome`, entre no LinkedIn nesse Chrome e rode **`/next-companies`** a cada rodada. Entre uma rodada e outra, **`/painel`** confere o que você já enviou e atualiza a aba Pendentes do painel, sem processar empresa nenhuma ([guia do painel](docs/guia/06-painel.md)).
+Depois, nos três sistemas: preencha o `perfil.local.md`, abra o Claude Code na pasta (`claude`) e rode **`/build-company-list`** para receber a planilha (não precisa de LinkedIn). Para o modo "Planilha + robô": rode `/chrome`, entre no LinkedIn nesse Chrome e rode **`/next-companies`** a cada rodada. Entre uma rodada e outra, **`/painel`** abre o painel na aba Pendentes, sem processar empresa nenhuma e sem abrir o LinkedIn ([guia do painel](docs/guia/06-painel.md)).
+
+**Como abrir o painel:** Dê duplo clique em painel/index.html, ou rode /painel. Se o painel for aberto direto e a gravação estiver desligada, o clique fica guardado e é salvo sozinho na próxima vez que o /painel ou o robô rodar.
 
 ## Requisitos
 
@@ -235,7 +237,7 @@ Ele usa a sua própria conta do Claude Code, e o gasto depende do seu plano e de
 <details>
 <summary><b>Meus dados vão para algum lugar?</b></summary>
 
-Seu perfil, planilhas, rascunhos, relatórios e currículos ficam só no seu computador (estão no `.gitignore`). O projeto não tem servidor. O que o Claude Code lê para trabalhar passa pela Anthropic, como em qualquer uso do Claude Code, e a navegação acontece no seu próprio Chrome.
+Seu perfil, planilhas, rascunhos, relatórios e currículos ficam só no seu computador (estão no `.gitignore`). Nada sai do seu computador. O botão Feito grava no projeto por um programinha que roda só no seu computador, só enquanto o painel está em uso. O que o Claude Code lê para trabalhar passa pela Anthropic, como em qualquer uso do Claude Code, e a navegação acontece no seu próprio Chrome.
 </details>
 
 <details>
@@ -248,7 +250,7 @@ Instalador e testes automáticos: ✅. O `install.ps1` roda no PowerShell 5.1 e 
 
 **O que o robô guarda.** Nome, cargo, empresa, link do perfil e, quando houver, o e-mail profissional de recrutadores e contatos de RH. Pela LGPD, isso é dado pessoal, mesmo quando vem de um perfil público.
 
-**Onde fica.** Só no computador de quem usa, nas pastas e arquivos que o `.gitignore` deixa fora do git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, as planilhas `.xlsx`, os `relatorio-*.md` e o `painel/data.json`. Nada vai para um servidor do projeto, porque o projeto não tem servidor.
+**Onde fica.** Só no computador de quem usa, nas pastas e arquivos que o `.gitignore` deixa fora do git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, as planilhas `.xlsx`, os `relatorio-*.md` e os arquivos gerados do painel (`painel/data.json`, `painel/data.js`, `painel/servidor.js` e `painel/relatorios/`). Nada sai do seu computador. O botão Feito grava no projeto por um programinha que roda só no seu computador, só enquanto o painel está em uso.
 
 **Quem é responsável.** Quem usa o robô passa a ser o responsável por esses dados.
 

@@ -11,6 +11,10 @@ relatorio-final.md
 relatorio-parcial.md
 perfil.local.md
 painel/data.json
+painel/data.js
+painel/servidor.js
+painel/relatorios/
+controle/.painel-token
 
 # OS / tooling
 .DS_Store
@@ -18,7 +22,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .code-review-graph/
-painel/data.js
 docs/_tmp/
 
 # Local alias of PROMPT-prospeccao.md (symlink; not portable to Windows)

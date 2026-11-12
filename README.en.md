@@ -61,7 +61,7 @@
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icons/rascunhos.svg" width="40" alt=""><br><b>Drafts you review</b><br>LinkedIn messages and emails in your tone of voice, saved as drafts for you to read and send.</td>
-    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>A dashboard with everything left to do</b><br>The <b>Pendentes</b> (to-do) tab gathers, from every round, the LinkedIn messages (ready text and a copy button), the emails, the overdue follow-ups and your decisions. <code>/painel</code> refreshes the list without spending a round.</td>
+    <td width="33%" valign="top"><img src="assets/icons/painel.svg" width="40" alt=""><br><b>A dashboard with everything left to do</b><br>The <b>Pendentes</b> (to-do) tab gathers, from every round, the LinkedIn messages (ready text and a copy button), the emails, the overdue follow-ups and your decisions. <code>/painel</code> opens the dashboard from any folder, without spending a round.</td>
     <td width="33%" valign="top"><img src="assets/icons/tokens.svg" width="40" alt=""><br><b>Token savings with RTK</b><br>The installer sets up <a href="https://github.com/rtk-ai/rtk">RTK</a>, which trims command output before it reaches Claude.</td>
   </tr>
   <tr>
@@ -150,7 +150,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 `install.ps1` checks Python (`py -3` or `python`), installs RTK with `winget` and **copies** the skills to `%USERPROFILE%\.claude\skills`. After every `git pull`, run `py -3 scripts\atualizar_skills.py` to copy the new version.
 </details>
 
-Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the folder (`claude`) and run **`/build-company-list`** to get the spreadsheet (no LinkedIn needed). For "Spreadsheet + robot": run `/chrome`, log in to LinkedIn in that Chrome and run **`/next-companies`** every round. Between rounds, **`/painel`** checks what you already sent and refreshes the dashboard's Pendentes tab, without processing any company ([dashboard guide, in Portuguese](docs/guia/06-painel.md)).
+Then, on all three systems: fill in `perfil.local.md`, open Claude Code in the folder (`claude`) and run **`/build-company-list`** to get the spreadsheet (no LinkedIn needed). For "Spreadsheet + robot": run `/chrome`, log in to LinkedIn in that Chrome and run **`/next-companies`** every round. Between rounds, **`/painel`** opens the dashboard on the Pendentes tab, without processing any company and without opening LinkedIn ([dashboard guide, in Portuguese](docs/guia/06-painel.md)).
+
+**How to open the dashboard:** Double-click painel/index.html, or run /painel. If the dashboard is opened directly and saving is off, the click is kept and saved automatically the next time /painel or the robot runs.
 
 ## Requirements
 
@@ -235,7 +237,7 @@ It runs on your own Claude Code account, and usage depends on your plan and on h
 <details>
 <summary><b>Does my data go anywhere?</b></summary>
 
-Your profile, spreadsheets, drafts, reports and résumés stay on your computer (they are in `.gitignore`). The project has no server. What Claude Code reads to do the work goes through Anthropic, as with any Claude Code use, and browsing happens in your own Chrome.
+Your profile, spreadsheets, drafts, reports and résumés stay on your computer (they are in `.gitignore`). Nothing leaves your computer. The Feito button saves to the project through a small program that runs only on your computer, only while the dashboard is in use. What Claude Code reads to do the work goes through Anthropic, as with any Claude Code use, and browsing happens in your own Chrome.
 </details>
 
 <details>
@@ -248,7 +250,7 @@ Installer and automated tests: ✅. `install.ps1` runs on PowerShell 5.1 and 7, 
 
 **What the robot stores.** Name, job title, company, profile link and, when available, the work e-mail of recruiters and HR contacts. Under Brazil's LGPD (and laws like the GDPR), this is personal data, even when it comes from a public profile.
 
-**Where it lives.** Only on the user's computer, in the folders and files that `.gitignore` keeps out of git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, the `.xlsx` spreadsheets, the `relatorio-*.md` files and `painel/data.json`. Nothing goes to a project server, because the project has no server.
+**Where it lives.** Only on the user's computer, in the folders and files that `.gitignore` keeps out of git: `controle/`, `rascunhos/`, `relatorios/`, `evidencias/`, `curriculos/`, `perfil.local.md`, the `.xlsx` spreadsheets, the `relatorio-*.md` files and the files the dashboard generates (`painel/data.json`, `painel/data.js`, `painel/servidor.js` and `painel/relatorios/`). Nothing leaves your computer. The Feito button saves to the project through a small program that runs only on your computer, only while the dashboard is in use.
 
 **Who is responsible.** Whoever uses the robot becomes responsible for this data.
 

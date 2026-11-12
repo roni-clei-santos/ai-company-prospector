@@ -1,7 +1,8 @@
 name: browser-lab
 
-# Lab only: measures how each browser handles the panel opened from file:// and from http://127.0.0.1.
-# Fictitious data only. A browser result never fails the job; only a crash of the lab itself does.
+# Permanent test of the REAL panel in 11 headed browsers (fictitious project): A file:// + server,
+# B file:// without server (click queue), C http, D audit of every button (tests/browser_lab/inventario.md).
+# Any ❌ fails the job. AMBIENTE (the test could not run) is retried once, then only a warning.
 
 on:
   workflow_dispatch:
@@ -10,6 +11,8 @@ on:
       - "painel/**"
       - "scripts/gerar_painel.py"
       - "scripts/servidor_painel.py"
+      - "scripts/common.py"
+      - "skills/painel/**"
       - "tests/browser_lab/**"
       - ".github/workflows/browser-lab.yml"
 
@@ -41,12 +44,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Selenium (+ openpyxl for the fictitious project of the real panel)
-        run: python -m pip install "selenium>=4.20,<5" openpyxl
+      - name: Selenium (+ openpyxl and pytest for the fictitious project of tests/test_pendentes.py)
+        run: python -m pip install "selenium>=4.20,<5" openpyxl pytest
 
-      - name: Safari driver (macOS)
+      - name: Safari driver + JavaScript from Apple Events (macOS)
         if: runner.os == 'macOS'
-        run: sudo safaridriver --enable
+        run: |
+          sudo safaridriver --enable
+          # A and B open the page from disk (safaridriver does not open file://) and drive it with AppleScript
+          for domain in com.apple.Safari com.apple.Safari.SandboxBroker; do
+            defaults write "$domain" IncludeDevelopMenu -bool true || true
+            defaults write "$domain" AllowJavaScriptFromAppleEvents -bool true || true
+            defaults write "$domain" ShowDevelopMenu -bool true || true
+          done
 
       - name: Brave (macOS)
         id: brave_mac

@@ -125,7 +125,14 @@ fi
 # 4) Skills: symbolic links in ~/.claude/skills (same logic as scripts/atualizar_skills.py)
 python3 "$REPO/scripts/atualizar_skills.py" || fail "Não consegui instalar as skills em ~/.claude/skills."
 
-# 5) Personal profile -------------------------------------------------------------
+# 5) Project folder: /painel and the scripts find it from any folder -----------------
+if python3 "$REPO/scripts/common.py" --gravar-projeto "$REPO" >/dev/null; then
+  ok "Pasta do projeto gravada em ~/.config/ai-company-prospector/projeto"
+else
+  warn "Não consegui gravar o caminho do projeto em ~/.config/ai-company-prospector/projeto."
+fi
+
+# 6) Personal profile -------------------------------------------------------------
 if [[ -f "$REPO/perfil.local.md" ]]; then
   ok "perfil.local.md já existe (não mexi)"
 else

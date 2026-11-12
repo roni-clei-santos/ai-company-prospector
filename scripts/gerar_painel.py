@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Build painel/data.json (and painel/data.js) from the project files.
+"""Build painel/data.json (and painel/data.js) from the project files, and open the panel.
 
 Reads: controle/progresso.json, relatorios/rodada-*.md, relatorio-final.xlsx (or the company sheet),
 relatorio-parcial.md (sections 2, 3 and 4) and the drafts in rascunhos/linkedin/ and rascunhos/email/
 (for the "Pendentes" tab: everything the candidate still has to send or decide, from every round).
-Writes: painel/data.json and painel/data.js (same data as `window.PAINEL_DATA = ...`, so the
-panel also opens straight from disk, as a file:// page, read-only).
-Both outputs are personal data and are gitignored.
+Writes: painel/data.json, painel/data.js (`window.PAINEL_DATA = ...`, loaded with <script src>, so the
+panel also opens straight from disk), painel/relatorios/*.html (the reports cited by the panel) and,
+the first time, painel/servidor.js. All of them are personal data and are gitignored. It also saves
+the project folder in ~/.config/ai-company-prospector/projeto, so /painel works from any folder.
 
-By default the panel opens through the local server (scripts/servidor_painel.py, only on
-http://127.0.0.1, standard library only), started in the background or reused if it is already
-running for this project. Through the server, the "Feito" buttons record the item as sent.
+It starts (or reuses) the local server scripts/servidor_painel.py (http://127.0.0.1:47321, standard
+library only, stops by itself after 30 minutes without use) and opens painel/index.html in the default
+browser. Every "Feito" click is recorded in the project; with the server off, the page keeps the click
+and sends it the next time the panel is open with the server on.
 
-Usage (from the project folder; on Windows use `py -3` instead of `python3`):
+Usage (from any folder; on Windows use `py -3` instead of `python3`):
   python3 scripts/gerar_painel.py             build the data, start the local server and open the panel
-  python3 scripts/gerar_painel.py --no-open   build painel/data.json only (no server, no browser)
-  python3 scripts/gerar_painel.py --arquivo   build and open painel/index.html from disk (read-only)
+  python3 scripts/gerar_painel.py --no-open   build the data only (no server, no browser)
+  python3 scripts/gerar_painel.py --arquivo   build and open painel/index.html without starting the server
   python3 scripts/gerar_painel.py --demo      copy the panel + painel/demo-data.json to docs/demo/ (GitHub Pages)
 """
 import collections
@@ -34,8 +36,10 @@ from urllib.parse import unquote
 import openpyxl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import (DO_NOT_CONTACT, _fold, do_not_contact, find_company_sheet, mentions_person,  # noqa: E402
-                    normalize_url, project_root, read_profile_fields, split_status)
+from common import (DO_NOT_CONTACT, NO_PROJECT, PANEL_PORTS, SERVER_JS, _fold, do_not_contact,  # noqa: E402
+                    find_company_sheet, find_project, mentions_person, normalize_url, painel_token,
+                    read_profile_fields, save_project_pointer, split_status, write_server_js)
+from relatorio_html import html_name, render_reports  # noqa: E402
 
 GMAIL_DRAFTS = "https://mail.google.com/mail/u/0/#drafts"
 
@@ -106,7 +110,8 @@ def parse_round(path):
     text = path.read_text(encoding="utf-8")
     title = text.splitlines()[0].lstrip("# ").strip() if text else path.stem
     m = re.search(r"(\d{4}-\d{2}-\d{2})", path.name)
-    info = {"arquivo": f"relatorios/{path.name}", "titulo": title, "data": m.group(1) if m else None}
+    info = {"arquivo": f"relatorios/{path.name}", "arquivo_html": f"relatorios/{html_name(path.name)}",
+            "titulo": title, "data": m.group(1) if m else None}
 
     companies = []
     for cells in table_rows(section(text, "Empresa por empresa")):
@@ -324,6 +329,18 @@ def _blocked_by_person(text, people):
     return any(mentions_person(text, p) for p in people)
 
 
+def https_link(url):
+    """External link for the panel: absolute http(s) only; LinkedIn always https. Anything else -> None."""
+    url = (url or "").strip()
+    if not url:
+        return None
+    if re.match(r"^(?:www\.)?linkedin\.com/", url, re.I):
+        url = "https://" + url
+    if re.match(r"^http://(?:[a-z]{2,3}\.|www\.)?linkedin\.com/", url, re.I):
+        url = "https://" + url[len("http://"):]
+    return url if re.match(r"^https?://[^\s\"'<>]+$", url, re.I) else None
+
+
 def pending_linkedin(root, parcial, companies, blocked_nums, people):
     """Every LinkedIn message still to send, in the PROMPT 6.0 order. -> (items, hidden_by_nao_contatar)."""
     header, rows = table(section(parcial, "4."))
@@ -355,7 +372,7 @@ def pending_linkedin(root, parcial, companies, blocked_nums, people):
         items.append({
             "id": "li:" + (normalize_url(unquote(url)) or f"{num}:{_fold(name)}"),
             "numero": num, "empresa": info.get("empresa") or "", "nome": name, "cargo": cargo,
-            "perfil": url, "tipo": kind, "tipo_rotulo": kind_label,
+            "perfil": https_link(url), "tipo": kind, "tipo_rotulo": kind_label,
             "texto": textos[0]["texto"] if textos else "",
             "texto_rotulo": textos[0]["rotulo"] if textos else None,
             "extras": textos[1:], "arquivo": arq,
@@ -508,8 +525,9 @@ def pending_decisions(root, parcial, parsed_rounds, companies, statuses):
             continue
         report = _company_report(root, num)
         out.append(dict(d, id=f"de:{key}", empresa=companies.get(num, {}).get("empresa", ""),
-                        link=job_link(root, num, d["motivo"]),
-                        relatorio=f"relatorios/{report.name}" if report else None))
+                        link=https_link(job_link(root, num, d["motivo"])),
+                        relatorio=f"relatorios/{report.name}" if report else None,
+                        relatorio_html=f"relatorios/{html_name(report.name)}" if report else None))
     return out
 
 
@@ -678,10 +696,26 @@ def build(root, today=None):
     }
 
 
+def render_cited_reports(root, data):
+    """Pre-render every relatorios/*.md cited by the panel into painel/relatorios/<name>.html.
+    A link whose .md does not exist is removed from the data (its button does not appear)."""
+    root = Path(root)
+    cited = [it.get("relatorio") for it in (data.get("pendentes") or {}).get("decisoes", [])]
+    if data.get("rodada"):
+        cited.append(data["rodada"].get("arquivo"))
+    done = render_reports(root, cited)
+    for it in (data.get("pendentes") or {}).get("decisoes", []):
+        it["relatorio_html"] = done.get(it.get("relatorio"))
+    if data.get("rodada"):
+        data["rodada"]["arquivo_html"] = done.get(data["rodada"].get("arquivo"))
+    return done
+
+
 def build_demo():
     repo = Path(__file__).resolve().parent.parent
     html = (repo / "painel" / "index.html").read_text(encoding="utf-8")
     html = html.replace('<meta name="painel-data" content="data.json">', '<meta name="painel-data" content="demo-data.json">')
+    html = html.replace('<script src="servidor.js" onerror="void 0"></script>\n', "")
     html = html.replace('<script src="data.js" onerror="void 0"></script>\n', "")
     out = repo / "docs" / "demo"
     out.mkdir(parents=True, exist_ok=True)
@@ -690,25 +724,95 @@ def build_demo():
     print("docs/demo/index.html + docs/demo/demo-data.json")
 
 
-def open_panel(target):
-    """Open the panel (a URL or a file) in the default browser (macOS, Linux and Windows). True if it opened."""
-    uri = target if str(target).startswith("http") else Path(target).resolve().as_uri()
+def _mac_default_browser():
+    """Bundle id of the default web browser on macOS (LaunchServices), or None."""
+    import plistlib
+    plist = Path.home() / "Library" / "Preferences" / "com.apple.LaunchServices" / "com.apple.launchservices.secure.plist"
     try:
+        handlers = plistlib.loads(plist.read_bytes()).get("LSHandlers", [])
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return None
+    for scheme in ("https", "http"):
+        for h in handlers:
+            if h.get("LSHandlerURLScheme") == scheme and h.get("LSHandlerRoleAll"):
+                return h["LSHandlerRoleAll"]
+    return None
+
+
+def _windows_browser_command(uri):
+    """Command line that opens `uri` in the default web browser on Windows, or None."""
+    import winreg
+    try:
+        key = r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+            progid = winreg.QueryValueEx(k, "ProgId")[0]
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, progid + r"\shell\open\command") as k:
+            cmd = winreg.QueryValueEx(k, "")[0]
+    except OSError:
+        return None
+    return cmd.replace("%1", uri) if "%1" in cmd else f'{cmd} "{uri}"'
+
+
+def open_file_in_browser(uri):
+    """Open a file:// page in the default WEB BROWSER (not in the app associated with .html). True if it opened."""
+    try:
+        if sys.platform == "darwin":
+            bundle = _mac_default_browser() or "com.apple.Safari"
+            return subprocess.run(["open", "-b", bundle, uri], capture_output=True, timeout=30).returncode == 0
+        if os.name == "nt":
+            cmd = _windows_browser_command(uri)
+            if not cmd:
+                return False
+            subprocess.Popen(cmd, close_fds=True,
+                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+            return True
         return bool(webbrowser.open(uri))
-    except webbrowser.Error:
+    except (OSError, subprocess.SubprocessError, webbrowser.Error):
         return False
 
 
-def _running_server(root):
-    """URL of a server already running for this project, or None."""
-    state = Path(root) / "controle" / ".painel-servidor.json"
+def open_panel(index_html, server_url=None):
+    """Open the panel in the default browser (macOS, Linux and Windows). Returns what was opened, or None.
+
+    The page from disk (file://) comes first: it is the same page as a double click on painel/index.html,
+    so the "Feito" clicks kept in that page (localStorage) are sent as soon as it opens with the server on.
+    If the file cannot be opened in a browser, the server address is opened instead."""
+    uri = Path(index_html).resolve().as_uri()
+    if Path(index_html).exists() and open_file_in_browser(uri):
+        return uri
     try:
-        info = json.loads(state.read_text(encoding="utf-8"))
-        with urllib.request.urlopen(f"http://127.0.0.1:{int(info['porta'])}/api/estado", timeout=1.5) as r:
-            if Path(json.loads(r.read().decode("utf-8")).get("raiz") or "").resolve() == Path(root).resolve():
-                return info["url"]
-    except (OSError, ValueError, KeyError):
+        if server_url and webbrowser.open(server_url):
+            return server_url
+        if Path(index_html).exists() and webbrowser.open(uri):
+            return uri
+    except webbrowser.Error:
         pass
+    return None
+
+
+def _server_info(port, token, timeout=1.5):
+    req = urllib.request.Request(f"http://127.0.0.1:{int(port)}/api/estado", headers={"X-Painel-Token": token})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _running_server(root):
+    """URL of a server (this version) already running for this project, or None."""
+    root = Path(root)
+    token = painel_token(root)
+    ports = list(PANEL_PORTS)
+    try:
+        state = json.loads((root / "controle" / ".painel-servidor.json").read_text(encoding="utf-8"))
+        ports.insert(0, int(state["porta"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    for port in dict.fromkeys(ports):
+        try:
+            info = _server_info(port, token)
+        except (OSError, ValueError):
+            continue
+        if info.get("versao", 0) >= 2 and Path(info.get("raiz") or "").resolve() == root.resolve():
+            return f"http://127.0.0.1:{port}/index.html"
     return None
 
 
@@ -742,27 +846,36 @@ def main(argv=None):
     if "--demo" in args:
         build_demo()
         return
-    root = project_root()
+    root = find_project()
+    if root is None:
+        print(NO_PROJECT)
+        sys.exit(1)
     data = build(root)
     out = root / "painel"
     out.mkdir(exist_ok=True)
+    render_cited_reports(root, data)
     payload = json.dumps(data, ensure_ascii=False, indent=2)
     (out / "data.json").write_text(payload + "\n", encoding="utf-8")
     (out / "data.js").write_text(f"window.PAINEL_DATA = {payload};\n", encoding="utf-8")
+    save_project_pointer(root)
+    if not (root / SERVER_JS).exists():  # the server rewrites it with its real port when it starts
+        write_server_js(root, PANEL_PORTS[0], painel_token(root))
     p = data["projeto"]
     print(f"painel/data.json: {p['concluidas']} de {p['total']} empresas; "
           f"rodada: {data['rodada']['arquivo'] if data['rodada'] else 'nenhuma'}")
     if "--no-open" in args:
         return
-    index_html = out / "index.html"
     url = None if "--arquivo" in args else ensure_server(root)
     if url is None and "--arquivo" not in args:
-        print("Não consegui iniciar o servidor local; abrindo o arquivo (o Feito fica desativado).")
-    target = url or index_html
-    if (url or index_html.exists()) and open_panel(target):
-        print(f"Painel aberto no navegador: {target if url else 'painel/index.html'}")
+        print("Não consegui iniciar o servidor local agora. O painel abre do arquivo e guarda os cliques em "
+              "\"Feito\" até a próxima vez que o /painel ou o robô rodar.")
+    elif url:
+        print(f"Servidor local: {url.rsplit('/', 1)[0]} (só neste computador)")
+    opened = open_panel(out / "index.html", url)
+    if opened:
+        print(f"Painel aberto no navegador: {opened}")
     else:
-        print(f"Abra no navegador: {url or index_html.resolve().as_uri()}")
+        print(f"Abra no navegador: {(out / 'index.html').resolve().as_uri()}")
 
 
 if __name__ == "__main__":

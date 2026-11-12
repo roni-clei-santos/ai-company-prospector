@@ -316,22 +316,128 @@
   }
 
   // ---------- "Feito": the candidate's click is the source of truth ----------
-  // servidor: opened by /painel (scripts/servidor_painel.py) -> POST records the item as sent;
-  // demo: GitHub Pages -> only strikes the item on screen; arquivo: opened from disk -> disabled.
-  let MODE = "arquivo";
-  const SERVER = window.PAINEL_SERVIDOR || null;
-  async function api(path, id) {
-    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Painel-Token": SERVER.token }, body: JSON.stringify({ id }) });
-    const out = await r.json().catch(() => ({ ok: false, erro: "resposta inválida do servidor" }));
-    if (!r.ok || !out.ok) throw new Error(out.erro || ("erro " + r.status));
+  // The click changes the screen at once, enters a queue in localStorage ("painel-fila-v1") and is sent,
+  // in order, to the local server (scripts/servidor_painel.py; address and token in servidor.js). It works
+  // from the server (http) and straight from disk (file://, through CORS). Server off: the queue waits and
+  // is sent on load, on every click, every 10 s, on focus/visibility/online. Demo (GitHub Pages): only strikes.
+  let MODE = "real";        // "real" | "demo"
+  let DATA = null;          // last data: data.js, or /data.json from the server
+  let ONLINE = null;        // last contact with the server: null (not yet), true, false
+  let ERRO = "";            // last error that is not "server off"
+  const QKEY = "painel-fila-v1";
+  let MEMQ = [];
+  const qLoad = () => { try { const v = JSON.parse(localStorage.getItem(QKEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return MEMQ.slice(); } };
+  const qSave = q => { MEMQ = q.slice(); try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) { /* storage off: memory only */ } };
+  const srv = () => window.PAINEL_SERVIDOR || null;
+  const base = () => { const s = srv(); return s && s.url ? String(s.url).replace(/\/+$/, "") : (location.protocol.startsWith("http") ? location.origin : null); };
+  function reloadServerJs() {  // the server may have started on another port: read servidor.js again
+    return new Promise(res => {
+      const el = document.createElement("script");
+      let done = false;
+      const end = () => { if (!done) { done = true; el.remove(); res(); } };
+      el.src = "servidor.js?t=" + Date.now(); el.onload = end; el.onerror = end; setTimeout(end, 3000);
+      document.head.appendChild(el);
+    });
+  }
+  async function call(method, path, body) {
+    const s = srv(), b = base();
+    const off = msg => { const e = new Error(msg); e.rede = true; return e; };
+    if (!s || !s.token || !b) throw off("sem servidor");
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 5000);
+    let r;
+    try {
+      r = await fetch(b + path, { method, cache: "no-store", signal: ctrl.signal, body: body ? JSON.stringify(body) : undefined,
+        headers: Object.assign({ "X-Painel-Token": s.token }, body ? { "Content-Type": "application/json" } : {}) });
+    } catch (e) { throw off("sem conexão"); } finally { clearTimeout(timer); }
+    const out = await r.json().catch(() => null);
+    if (r.status === 403) throw off("acesso negado");
+    if (!r.ok || !out || out.ok === false) throw new Error((out && out.erro) || ("erro " + r.status));
     return out;
+  }
+  async function callRetry(method, path, body) {  // network error or 403: reload servidor.js once and try again
+    try { return await call(method, path, body); } catch (e) { if (!e.rede) throw e; await reloadServerJs(); return call(method, path, body); }
+  }
+  const fetchData = () => callRetry("GET", "/data.json");
+  let sending = false;
+  async function sync() {
+    if (MODE === "demo" || sending) return;
+    sending = true;
+    let changed = false;
+    try {
+      if (!qLoad().length) await callRetry("GET", "/api/estado");  // keeps the server alive
+      if (ONLINE !== true) changed = true;
+      ONLINE = true;
+      let q;
+      while ((q = qLoad()).length) {
+        const it = q[0];
+        await callRetry("POST", it.acao === "desfazer" ? "/api/desfazer" : "/api/feito", { id: it.id });
+        qSave(qLoad().filter(x => !(x.id === it.id && x.ts === it.ts && x.acao === it.acao)));
+        ERRO = ""; changed = true;
+      }
+      if (changed) { const d = await fetchData(); if (d && d.pendentes) DATA = d; }
+    } catch (e) {
+      if (e.rede) { if (ONLINE !== false) changed = true; ONLINE = false; } else { ERRO = e.message; changed = true; }
+    } finally { sending = false; }
+    if (changed && DATA) rerender();
+  }
+  let syncBound = false;
+  function initSync() {
+    if (syncBound || MODE === "demo") return;
+    syncBound = true;
+    setInterval(() => { if (qLoad().length) sync(); }, 10000);
+    setInterval(() => { if (document.visibilityState === "visible") sync(); }, 60000);
+    window.addEventListener("focus", sync);
+    window.addEventListener("online", sync);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sync(); });
+    sync();
+  }
+  const rerender = () => { const y = window.scrollY; render(DATA); window.scrollTo({ top: y, behavior: "instant" }); };
+  const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const LISTS = [["linkedin", "linkedin"], ["emails", "email"], ["decisoes", "decisao"], ["respostas", "resposta"]];
+  function describe(kind, it) {
+    if (kind === "linkedin") return "LinkedIn para " + it.nome;
+    if (kind === "email") return `e-mail para ${it.para} (${it.assunto})`;
+    if (kind === "followup") return "follow-up para " + it.quem;
+    if (kind === "resposta") return "resposta tratada: " + it.texto;
+    return "decisão tomada: " + it.motivo;
+  }
+  function view(d) {  // the data as the candidate sees it: with the clicks still in the queue applied
+    const q = MODE === "demo" ? [] : qLoad();
+    if (!q.length) return d;
+    const v = JSON.parse(JSON.stringify(d));
+    const p = v.pendentes = v.pendentes || {};
+    p.enviados_hoje = p.enviados_hoje || [];
+    for (const a of q) {
+      if (a.acao !== "feito") { p.enviados_hoje = p.enviados_hoje.filter(x => x.id !== a.id); continue; }
+      let hit = null;
+      for (const [key, kind] of LISTS) {
+        const i = (p[key] || []).findIndex(x => x.id === a.id);
+        if (i >= 0) { hit = [kind, p[key].splice(i, 1)[0]]; break; }
+      }
+      if (!hit) { const i = (v.followups || []).findIndex(f => fuId(f) === a.id); if (i >= 0) hit = ["followup", v.followups.splice(i, 1)[0]]; }
+      if (hit && !p.enviados_hoje.some(x => x.id === a.id)) {
+        const it = hit[1];
+        p.enviados_hoje.push({ id: a.id, tipo: hit[0], data: todayIso(), descricao: describe(hit[0], it), empresa: it.empresa || "",
+          numero: it.numero != null ? it.numero : (it.numeros || [])[0], guardado: true });
+      }
+    }
+    return v;
+  }
+  function click(acao, id) {
+    const q = qLoad();
+    const queued = q.findIndex(x => x.acao === "feito" && x.id === id);
+    if (acao === "desfazer" && queued >= 0) q.splice(queued, 1);  // never left this page: just cancel it
+    else q.push({ acao, id, ts: Date.now() });
+    qSave(q);
+    rerender();
+    sync();
   }
 
   // ---------- copy to clipboard (works from file:// too) ----------
   const COPY = [];
-  function copyText(text) {
+  function copyText(text) {  // -> Promise<boolean>
     if (navigator.clipboard && window.isSecureContext !== false) {
-      return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+      return navigator.clipboard.writeText(text).then(() => true, () => fallbackCopy(text));
     }
     return Promise.resolve(fallbackCopy(text));
   }
@@ -339,27 +445,34 @@
     const ta = document.createElement("textarea");
     ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); } finally { ta.remove(); }
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; } finally { ta.remove(); }
+    return ok;
   }
+  // external links: absolute http(s) only (LinkedIn always https), new tab, rel="noopener"
+  const extUrl = u => { u = String(u || "").trim(); if (!/^https?:\/\/[^\s"'<>]+$/i.test(u)) return null;
+    return u.replace(/^http:\/\/((?:[a-z]{2,3}\.|www\.)?linkedin\.com\/)/i, "https://$1"); };
+  const extLink = (u, lbl, cls) => { const h = extUrl(u); return h ? `<a class="${cls || "btn"}" href="${esc(h)}" target="_blank" rel="noopener">${esc(lbl)}</a>` : ""; };
   const copyBtn = (text, lbl) => { COPY.push(text); return `<button class="btn primary copy" type="button" data-copy="${COPY.length - 1}">${esc(lbl || "Copiar texto")}</button>`; };
 
   const plural = (n, one, many) => `<b>${n}</b> ${n === 1 ? one : many}`;
   const joinPt = parts => parts.length < 2 ? parts.join("") : parts.slice(0, -1).join(", ") + " e " + parts[parts.length - 1];
   const cap = s => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); };
-  const OFF_HINT = "Abra pelo /painel para registrar";
-  const doneBox = id => MODE === "arquivo"
-    ? `<label class="done-box off" title="${OFF_HINT}"><input type="checkbox" data-done="${esc(id)}" disabled> Feito</label>`
-    : `<label class="done-box"${MODE === "demo" ? ' title="Demonstração: só risca na tela"' : ""}><input type="checkbox" data-done="${esc(id)}"> Feito</label>`;
+  const doneBox = id => `<label class="done-box"${MODE === "demo" ? ' title="Demonstração: só risca na tela"' : ""}><input type="checkbox" data-done="${esc(id)}"> Feito</label>`;
   const task = (id, n, body, due) => `<article class="task" data-id="${esc(id)}"><div class="n${due ? " due" : ""}">${n}</div><div>${body}</div>${doneBox(id)}</article>`;
   const nothing = `<div class="empty">Nada pendente aqui</div>`;
   const company = it => it.numero != null ? `#${esc(it.numero)}${it.empresa ? " " + esc(it.empresa) : ""}` : esc(it.empresa || "");
   const fuId = f => f.id || ("fu:" + ((f.numeros && f.numeros.length) ? f.numeros.join(",") : f.quem) + ":" + f.data);
   const KIND = { linkedin: "LinkedIn", email: "E-mail", followup: "Follow-up", resposta: "Resposta", decisao: "Decisão" };
-  const MODE_LINE = {
-    servidor: `<div class="mode-line on">Marcou como Feito, está registrado.</div>`,
-    arquivo: `<div class="mode-line">${OFF_HINT}: aberto direto do arquivo, o "Feito" fica desativado.</div>`,
-    demo: `<div class="mode-line">Demonstração: o "Feito" só risca o item na tela.</div>`
-  };
+  function statusLine() {
+    if (MODE === "demo") return `<div class="mode-line">Demonstração: o "Feito" só risca o item na tela.</div>`;
+    const n = qLoad().length;
+    const kept = `(${n} ${n === 1 ? "clique guardado" : "cliques guardados"})`;
+    if (ERRO) return `<div id="acao-status" class="mode-line bad" role="status">Não consegui salvar: ${esc(ERRO)}. Vou tentar de novo sozinho.${n ? " " + kept : ""}</div>`;
+    if (n && ONLINE !== true) return `<div id="acao-status" class="mode-line bad" role="status">Marcado. Vou salvar no projeto na próxima vez que o painel for aberto pelo /painel ou pelo robô. ${kept}</div>`;
+    if (ONLINE) return `<div id="acao-status" class="mode-line on" role="status">Marcou como Feito, está registrado.</div>`;
+    return `<div id="acao-status" class="mode-line" role="status" hidden></div>`;
+  }
 
   function renderPending(d) {
     const p = d.pendentes;
@@ -378,10 +491,10 @@
           <ul>${diffs.map(x => `<li><b>${esc(x.nome)}</b>: ${side(x)}${x.motivo ? ` (${esc(x.motivo)})` : ""}</li>`).join("") || `<li>${esc(c.linkedin_secao4)} no relatório, ${esc(c.linkedin_painel)} nesta lista</li>`}</ul></details>`;
     const chip = (target, n, lbl) => `<button class="chip" type="button" data-jump="${target}"><b>${n}</b> ${esc(lbl)}</button>`;
     let h = `<section id="pendentes" class="fade">
-      ${MODE_LINE[MODE]}<div id="acao-status" class="mode-line" role="status" hidden></div>
+      ${statusLine()}
       <div class="card hero"><div class="label">O que falta você fazer, de todas as rodadas</div>
         <p class="big">${totals}</p>
-        <div class="chips">${chip("p-hoje", due.length + replies.length, "Fazer hoje")}${chip("p-linkedin", li.length, "LinkedIn")}${chip("p-emails", em.length, "E-mails")}${chip("p-decisoes", dec.length, "Decisões suas")}${MODE === "servidor" ? chip("p-enviados", sent.length, "Enviados hoje") : ""}</div>
+        <div class="chips">${chip("p-hoje", due.length + replies.length, "Fazer hoje")}${chip("p-linkedin", li.length, "LinkedIn")}${chip("p-emails", em.length, "E-mails")}${chip("p-decisoes", dec.length, "Decisões suas")}${MODE !== "demo" ? chip("p-enviados", sent.length, "Enviados hoje") : ""}</div>
         ${check}
       </div>`;
 
@@ -402,7 +515,7 @@
       return task(it.id, it.ordem, `<div class="head"><span class="company">${company(it)}</span><span class="pill kind-${esc(it.tipo)}">${esc(it.tipo_rotulo)}</span></div>
         <div class="who"><b>${esc(it.nome)}</b>${it.cargo ? ` <span>· ${esc(it.cargo)}</span>` : ""}</div>
         ${text}${extras}
-        <div class="actions">${it.perfil ? `<a class="btn" href="${esc(it.perfil)}" target="_blank" rel="noopener">Abrir perfil</a>` : ""}${it.texto ? copyBtn(it.texto) : ""}</div>`);
+        <div class="actions">${extLink(it.perfil, "Abrir perfil")}${it.texto ? copyBtn(it.texto) : ""}</div>`);
     }).join("")}</div>` : nothing;
 
     // d) E-mails
@@ -412,21 +525,21 @@
         <div class="line"><span class="meta">Para:</span> <b>${esc(it.para)}</b></div>
         <div class="line"><span class="meta">Assunto:</span> ${esc(it.assunto)}</div>
         ${!gmail && it.texto ? `<div class="msg">${esc(it.texto)}</div>` : ""}
-        <div class="actions">${gmail ? `<a class="btn primary" href="${esc(p.gmail_rascunhos)}" target="_blank" rel="noopener">Abrir Rascunhos do Gmail</a>` : (it.texto ? copyBtn(it.texto) : "")}</div>`)).join("")}</div>` : nothing;
+        <div class="actions">${gmail ? extLink(p.gmail_rascunhos, "Abrir Rascunhos do Gmail", "btn primary") : (it.texto ? copyBtn(it.texto) : "")}</div>`)).join("")}</div>` : nothing;
 
     // e) Decisões suas
     h += `<h2 class="group" id="p-decisoes">Decisões suas <span class="count">${dec.length}</span><small>vagas em que o robô não se candidatou</small></h2>`;
     h += dec.length ? `<div class="list">${dec.map((it, i) => task(it.id, i + 1, `<div class="head"><span class="company">${company(it)}</span></div>
         <div class="line">${esc(cap(it.motivo))}</div>
         <div class="meta">Fonte: ${esc(it.origem)}</div>
-        <div class="actions">${it.link ? `<a class="btn primary" href="${esc(it.link)}" target="_blank" rel="noopener">Abrir a vaga</a>` : ""}${it.relatorio && !d.demo ? `<a class="btn" href="../${esc(it.relatorio)}" target="_blank" rel="noopener">Relatório da empresa</a>` : ""}</div>`)).join("")}</div>` : nothing;
+        <div class="actions">${extLink(it.link, "Abrir a vaga", "btn primary")}${it.relatorio_html && !d.demo ? `<a class="btn" href="${esc(it.relatorio_html)}" data-relatorio>Relatório da empresa</a>` : ""}</div>`)).join("")}</div>` : nothing;
 
-    // f) Enviados hoje (only through the local server: each one can be undone)
-    if (MODE === "servidor") {
+    // f) Enviados hoje: each one can be undone (a click still in the queue too)
+    if (MODE !== "demo") {
       h += `<h2 class="group" id="p-enviados">Enviados hoje <span class="count">${sent.length}</span><small>marcados como Feito hoje</small></h2>`;
       h += sent.length ? `<div class="list">${sent.map((it, i) => `<article class="task sent" data-id="${esc(it.id)}"><div class="n ok">✓</div><div>
           <div class="head"><span class="pill kind-mensagem">${esc(KIND[it.tipo] || it.tipo)}</span><span class="company">${it.numero != null ? "#" + esc(it.numero) + " " : ""}${esc(it.empresa || "")}</span></div>
-          <div class="line">${esc(cap(it.descricao))}</div><div class="meta">Registrado em ${esc(br(it.data))}</div></div>
+          <div class="line">${esc(cap(it.descricao))}</div><div class="meta">${it.guardado ? "Guardado neste navegador: vai para o projeto assim que o painel abrir pelo /painel ou pelo robô" : "Registrado em " + esc(br(it.data))}</div></div>
           <button class="btn" type="button" data-undo="${esc(it.id)}">Desfazer</button></article>`).join("")}</div>`
         : `<div class="empty">Nada marcado como Feito hoje.</div>`;
     }
@@ -436,41 +549,28 @@
 
   function bindPending(app) {
     app.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
-      copyText(COPY[+b.getAttribute("data-copy")]).then(() => {
-        const old = b.textContent; b.textContent = "Copiado ✓"; b.classList.add("copied");
+      copyText(COPY[+b.getAttribute("data-copy")]).then(ok => {
+        const old = b.textContent; b.textContent = ok ? "Copiado ✓" : "Não copiou: selecione o texto"; b.classList.toggle("copied", ok);
         setTimeout(() => { b.textContent = old; b.classList.remove("copied"); }, 1600);
       });
     }));
-    const status = (msg, bad) => {
-      const el = document.getElementById("acao-status"); if (!el) return;
-      el.hidden = !msg; el.textContent = msg || ""; el.classList.toggle("bad", !!bad); el.classList.toggle("on", !bad);
-    };
-    const rerender = (data, msg) => {
-      const y = window.scrollY; render(data); window.scrollTo({ top: y, behavior: "instant" }); status(msg);
-    };
     app.querySelectorAll("[data-done]").forEach(cb => cb.addEventListener("change", () => {
       const art = cb.closest(".task");
       if (MODE === "demo") { art.classList.toggle("done", cb.checked); return; }
-      if (MODE !== "servidor" || !cb.checked) return;
-      cb.disabled = true; art.classList.add("done");
-      api("api/feito", cb.getAttribute("data-done"))
-        .then(out => rerender(out.dados, "Registrado como enviado hoje. Está em \"Enviados hoje\", com o botão Desfazer."))
-        .catch(e => { cb.checked = false; cb.disabled = false; art.classList.remove("done"); status("Não registrei: " + e.message, true); });
+      if (!cb.checked) return;
+      art.classList.add("done");
+      click("feito", cb.getAttribute("data-done"));
     }));
-    app.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click", () => {
-      b.disabled = true;
-      api("api/desfazer", b.getAttribute("data-undo"))
-        .then(out => rerender(out.dados, (out.avisos && out.avisos.length) ? "Desfeito, com avisos: " + out.avisos.join("; ") : "Desfeito: o item voltou para os pendentes."))
-        .catch(e => { b.disabled = false; status("Não desfiz: " + e.message, true); });
-    }));
+    app.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click", () => click("desfazer", b.getAttribute("data-undo"))));
     app.querySelectorAll("[data-jump]").forEach(b => b.addEventListener("click", () => {
       const el = document.getElementById(b.getAttribute("data-jump")); if (el) el.scrollIntoView({ behavior: "smooth" });
     }));
   }
 
   // ---------- render ----------
-  function render(d) {
-    MODE = SERVER && location.protocol.startsWith("http") ? "servidor" : (d.demo ? "demo" : "arquivo");
+  function render(raw) {
+    MODE = raw.demo ? "demo" : "real";
+    const d = view(raw);
     COPY.length = 0;
     const p = d.projeto || {}, r = d.rodada;
     const pct = p.total ? Math.round((p.concluidas / p.total) * 100) : 0;
@@ -482,7 +582,7 @@
     let html = renderPending(d);
 
     // Última rodada
-    html += `<section id="rodada" class="fade"><h2>Última rodada ${r ? `<small>${esc(br(r.data))} · ${esc(r.arquivo)}</small>` : ""}</h2>`;
+    html += `<section id="rodada" class="fade"><h2>Última rodada ${r ? `<small>${esc(br(r.data))} · ${r.arquivo_html && !d.demo ? `<a href="${esc(r.arquivo_html)}" data-relatorio>${esc(r.arquivo)}</a>` : esc(r.arquivo)}</small>` : ""}</h2>`;
     if (!r) {
       html += `<div class="empty">Ainda não há rodada. Rode <code>/next-companies</code>.</div>`;
     } else {
@@ -582,10 +682,13 @@
     document.getElementById("headline").textContent = "Painel sem dados";
     document.getElementById("app").innerHTML = `<div class="empty" style="margin-top:30px">${msg}</div>`;
   }
-  if (window.PAINEL_DATA) { render(window.PAINEL_DATA); return; }
+  function start(d) { DATA = d; render(d); initSync(); }
+  if (window.PAINEL_DATA) { start(window.PAINEL_DATA); return; }
   const src = (new URLSearchParams(location.search).get("data")) || document.querySelector('meta[name="painel-data"]').content;
-  fetch(src, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render)
-    .catch(() => fail("Não achei os dados do painel. Rode <code>python3 scripts/gerar_painel.py</code> na pasta do projeto e abra de novo."));
+  fetch(src, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .catch(() => fetchData())  // opened from disk without data.js: ask the local server
+    .then(d => { if (!d || !d.projeto) throw new Error("sem dados"); start(d); })
+    .catch(() => fail("Não achei os dados do painel. Rode <code>/painel</code> (ou <code>python3 scripts/gerar_painel.py</code>) e abra de novo."));
 })();
 </script>
 </body>
